@@ -68,7 +68,30 @@ function seloTeto(nome,teto,preco){
   const abaixo=preco<=teto;
   return `<span class="selo ${abaixo?'ok':'bad'}">${nome}: ${abaixo?'abaixo do teto':'acima do teto'}</span>`;
 }
-const FONTE_NOME={brapi:'brapi.dev',robo:'robô do GitHub'};
+const FONTE_NOME={brapi:'brapi.dev',robo:'robô do GitHub',relatorio:'relatório gerencial',investidor10:'Investidor10'};
+
+/* ---------- preço teto por vários métodos ----------
+   Todos em centavos. Premissas editáveis em Configurações → Preço teto. */
+const ehFII=a=>a.classe==='FIIs';
+function metodosTeto(a){
+  const P=S.premissas, fii=ehFII(a), preco=a.cotacao>0?a.cotacao:null;
+  const taxa=fii?(P.taxaFII>0?P.taxaFII:.08):(P.taxaBazin>0?P.taxaBazin:.06);
+  const k=P.gordonK>0?P.gordonK:.12, g=isFinite(P.gordonG)?P.gordonG:.03;
+  const pvp=P.pvpMax>0?P.pvpMax:1, pl=P.plAlvo>0?P.plAlvo:10;
+  const num=x=>x.toLocaleString('pt-BR',{maximumFractionDigits:2});
+  const lista=[
+    {id:'bazin',nome:fii?'Bazin (DY mínimo)':'Bazin',formula:'DPA 12m ÷ '+pct(taxa,1),valor:a.dpa>0?a.dpa/taxa:null,falta:'DPA 12 meses'},
+    {id:'gordon',nome:'Gordon',formula:'DPA × (1 + '+pct(g,1)+') ÷ ('+pct(k,1)+' − '+pct(g,1)+')',valor:a.dpa>0&&k>g?a.dpa*(1+g)/(k-g):null,falta:'DPA 12 meses'},
+  ];
+  if(fii)lista.push({id:'pvp',nome:'P/VP máximo',formula:'VP por cota × '+num(pvp),valor:a.vpa>0?a.vpa*pvp:null,falta:'VP por cota'});
+  else lista.push(
+    {id:'graham',nome:'Graham',formula:'√(22,5 × LPA × VPA)',valor:a.lpa>0&&a.vpa>0?Math.sqrt(22.5*(a.lpa/100)*(a.vpa/100))*100:null,falta:'LPA e VPA'},
+    {id:'pl',nome:'P/L justo',formula:'LPA × '+num(pl),valor:a.lpa>0?a.lpa*pl:null,falta:'LPA'});
+  lista.forEach(x=>{if(x.valor!==null){x.valor=Math.round(x.valor);x.margem=preco?(x.valor-preco)/x.valor:null}});
+  const vals=lista.filter(x=>x.valor>0).map(x=>x.valor).sort((x,y)=>x-y);
+  const mediana=vals.length?(vals.length%2?vals[(vals.length-1)/2]:Math.round((vals[vals.length/2-1]+vals[vals.length/2])/2)):null;
+  return{lista,mediana,margem:mediana&&preco?(mediana-preco)/mediana:null,preco,fii,dy:a.dpa>0&&preco?a.dpa/preco:null,n:vals.length};
+}
 
 /* ---------- cotações automáticas (brapi.dev, plano gratuito) ---------- */
 const TOKEN_KEY='liberdade65_brapi_token';
@@ -196,6 +219,7 @@ function cardAtivos(){
   <div class="card span2" id="cardAtivos">
     <h3>Ativos
       <span class="btnrow" style="text-transform:none;letter-spacing:0">
+        <button class="btn ghost sm" id="btnImpRel">Relatórios</button>
         <button class="btn ghost sm" id="btnImpCsv">Importar CSV</button>
         ${n?'<button class="btn ghost sm" id="btnCot">↻ Atualizar</button>':''}
       </span></h3>
@@ -208,7 +232,8 @@ function cardAtivos(){
       const m=metricasAtivo(a,T.total);
       const preco=m.preco?brl(Math.round(m.preco)):null;
       const fonte=a.cotacaoEm?`${FONTE_NOME[a.cotacaoFonte]||'cotação'} · ${dataHora(a.cotacaoEm)}`:'';
-      const selos=seloTeto('Bazin',m.bazin,m.preco)+seloTeto('Graham',m.graham,m.preco);
+      const mt=metodosTeto(a);
+      const selos=seloTeto('Preço teto',mt.mediana,m.preco)+(a.relatorios?.length?`<span class="selo neutral">${a.relatorios.length} relatório${a.relatorios.length>1?'s':''}</span>`:'');
       return `<button class="ativo" data-ativo="${a.id}" aria-label="${esc(a.nome)}, valor ${brl(m.valor)}${m.lucro!==null?', resultado '+brlS(m.lucro):''}">
         <span class="tk" aria-hidden="true">${esc((a.ticker||a.nome).slice(0,5).toUpperCase())}</span>
         <span class="nm">${esc(a.nome)}</span>
@@ -225,6 +250,7 @@ function cardAtivos(){
 function ligarCardAtivos(el){
   if($('#btnCot'))$('#btnCot').onclick=()=>atualizarCotacoes();
   $('#btnImpCsv')?.addEventListener('click',()=>abrirImportCarteira());
+  $('#btnImpRel')?.addEventListener('click',()=>abrirImportRelatorio());
   $$('[data-ativo]',el).forEach(b=>b.onclick=()=>abrirAtivo(b.dataset.ativo));
 }
 
@@ -233,11 +259,7 @@ function abrirAtivo(id){
   const a=id?S.ativos.find(x=>x.id===id):null;
   const classes=Object.keys(S.alocacaoAlvo);
   const T=totaisCarteira(), m=a?metricasAtivo(a,T.total):null;
-  const taxa=S.premissas.taxaBazin>0?S.premissas.taxaBazin:.06;
-  const linhaTeto=(nome,teto,margem,formula)=>`<div class="teto"><div><b>${nome}</b><div class="hint" style="margin:0">${formula}</div></div>
-    <div style="text-align:right">${teto?`<div class="num" style="font-weight:600">${brl(teto)}</div>
-      ${margem!==null?`<div class="num ${sinalCls(margem)}" style="font-size:var(--t-xs)">margem ${pctS(margem,1)}</div>`:'<div class="hint" style="margin:0">sem cotação</div>'}`
-      :'<span class="muted" style="font-size:var(--t-xs)">preencha os dados abaixo</span>'}</div></div>`;
+  const mt=a?metodosTeto(a):null;
   sheet(`<h2>${a?esc(a.nome):'Novo ativo'}</h2><div class="sh-sub">${a?esc(a.classe)+(a.ticker?' · '+esc(a.ticker):''):'Com ticker e quantidade, o valor passa a ser atualizado sozinho pela cotação do dia.'}</div>
   ${m?`<div class="metricas">
     <div class="stat"><div class="k">Valor atual</div><div class="v">${brl(m.valor)}</div><div class="d">peso ${pct(m.peso,1)} na carteira</div></div>
@@ -245,11 +267,8 @@ function abrirAtivo(id){
     <div class="stat"><div class="k">Cotação</div><div class="v">${m.preco?brl(Math.round(m.preco)):'—'}</div><div class="d">${a.cotacaoEm?(FONTE_NOME[a.cotacaoFonte]||'cotação')+' · '+dataHora(a.cotacaoEm):'ainda sem cotação'}</div></div>
     <div class="stat"><div class="k">Variação do dia</div><div class="v ${m.varDiaPct!==null?sinalCls(m.varDiaPct):''}">${m.varDiaPct!==null?pctS(m.varDiaPct):'—'}</div><div class="d ${m.varDia!==null?sinalCls(m.varDia):''}">${m.varDia!==null?brlS(m.varDia):''}</div></div>
   </div>
-  <div class="card flat" style="padding:var(--s3) var(--s4);margin-bottom:var(--s4)">
-    <h3 style="margin-bottom:var(--s1)">Preço teto ${seloTeto('Bazin',m.bazin,m.preco)}${seloTeto('Graham',m.graham,m.preco)}</h3>
-    ${linhaTeto('Bazin',m.bazin,m.margemBazin,'DPA ÷ '+pct(taxa,1)+(m.dy!==null?' · DY atual '+pct(m.dy,1):''))}
-    ${linhaTeto('Graham',m.graham,m.margemGraham,'√(22,5 × LPA × VPA)')}
-  </div>`:''}
+  ${blocoPrecoTeto(a,mt)}
+  ${blocoRendimentos(a)}`:''}
   <div class="fgroup"><label class="f" for="atNome">Nome</label><input class="inp" id="atNome" value="${a?esc(a.nome):''}" placeholder="Ex.: Tesouro IPCA+ 2035, MXRF11, IVVB11"></div>
   <div class="grid2">
     <div class="fgroup"><label class="f" for="atTicker">Ticker B3 (opcional)</label><input class="inp" id="atTicker" autocapitalize="characters" value="${a&&a.ticker?esc(a.ticker):''}" placeholder="Ex.: BBSE3, MXRF11"></div>
@@ -265,12 +284,14 @@ function abrirAtivo(id){
     <div class="grid2" style="grid-template-columns:repeat(3,minmax(0,1fr))">
       <div class="fgroup"><label class="f" for="atDpa">DPA 12 meses</label><input class="inp" id="atDpa" inputmode="decimal" value="${a?campoMoney(a.dpa):''}" placeholder="R$ por ação"></div>
       <div class="fgroup"><label class="f" for="atLpa">LPA</label><input class="inp" id="atLpa" inputmode="decimal" value="${a?campoMoney(a.lpa):''}" placeholder="R$"></div>
-      <div class="fgroup"><label class="f" for="atVpa">VPA</label><input class="inp" id="atVpa" inputmode="decimal" value="${a?campoMoney(a.vpa):''}" placeholder="R$"></div>
+      <div class="fgroup"><label class="f" for="atVpa">VPA / VP cota</label><input class="inp" id="atVpa" inputmode="decimal" value="${a?campoMoney(a.vpa):''}" placeholder="R$"></div>
     </div>
-    <b>DPA</b> = dividendos por ação pagos nos últimos 12 meses (você encontra no Investidor10 ou no RI da empresa). <b>LPA</b> = lucro por ação; <b>VPA</b> = valor patrimonial por ação. A taxa mínima do Bazin (${pct(taxa,1)}) muda em Configurações.
+    ${a?.dpaFonte?`<div class="okbox" style="margin-bottom:var(--s2)">DPA calculado de <b>${a.dpaFonte.meses} ${a.dpaFonte.meses>1?'meses':'mês'} de rendimentos</b>${a.dpaFonte.estimado?' (média × 12 até completar 12 meses)':' (soma dos últimos 12 meses)'}.</div>`:''}
+    <b>DPA</b> = dividendos por ação/cota pagos nos últimos 12 meses. <b>LPA</b> = lucro por ação. <b>VPA</b> = valor patrimonial por ação (nos FIIs, VP por cota). O jeito mais fácil é <b>importar os relatórios gerenciais</b> — eu preencho para você. As taxas de cada método mudam em Configurações.
   </div></details>
   <button class="btn" id="atSalvar">${a?'Salvar':'Adicionar'}</button>
   ${a?'<button class="btn ghost danger-txt" id="atExcluir" style="margin-top:8px">Remover ativo</button>':''}`);
+  $('#atRel')?.addEventListener('click',()=>abrirImportRelatorio(a.ticker));
   $('#atSalvar').onclick=()=>{
     const nome=normDesc($('#atNome').value), classe=$('#atClasse').value;
     const ticker=limparTicker($('#atTicker').value);
@@ -284,7 +305,9 @@ function abrirAtivo(id){
     if(ticker)alvo.ticker=ticker;else delete alvo.ticker;
     if(qtd>0)alvo.qtd=qtd;else delete alvo.qtd;
     const opc={precoMedio:'#atPm',investido:'#atInv',dpa:'#atDpa',lpa:'#atLpa',vpa:'#atVpa'};
+    const dpaAntes=alvo.dpa||0;
     for(const[k,sel]of Object.entries(opc)){const v=parseMoney($(sel).value);if(v>0)alvo[k]=v;else delete alvo[k]}
+    if((alvo.dpa||0)!==Math.round(dpaAntes))delete alvo.dpaFonte; /* DPA digitado à mão */
     if(mudouTicker){delete alvo.cotacao;delete alvo.variacao;delete alvo.cotacaoEm;delete alvo.cotacaoFonte}
     if(mudouTicker&&typeof aplicarCotacoesRobo==='function')aplicarCotacoesRobo();
     if(alvo.ticker&&alvo.qtd&&alvo.cotacao)alvo.valor=Math.round(alvo.qtd*alvo.cotacao);
@@ -403,4 +426,41 @@ function revisarImportCarteira(itens,erros){
     toast(itens.length+' ativo'+(itens.length===1?'':'s')+' importado'+(itens.length===1?'':'s')+' — buscando cotações');
     S.cotacoesEm=null;atualizarCotacoes({silencioso:true});
   };
+}
+
+/* ---------- blocos da folha do ativo ---------- */
+function blocoPrecoTeto(a,mt){
+  if(!a||!mt)return '';
+  const disp=mt.lista.filter(x=>x.valor>0);
+  const max=Math.max(mt.preco||0,...disp.map(x=>x.valor),1)*1.08;
+  const pos=v=>(v/max*100).toFixed(1)+'%';
+  return `<div class="card flat" style="padding:var(--s3) var(--s4);margin-bottom:var(--s4)" id="blocoTeto">
+    <h3 style="margin-bottom:var(--s2)">Preço teto ${seloTeto(mt.n>1?'Mediana':'Teto',mt.mediana,mt.preco)}
+      <button class="btn ghost sm" id="atRel" style="text-transform:none;letter-spacing:0">Importar relatório</button></h3>
+    ${mt.mediana?`<div class="row" style="align-items:flex-end;margin-bottom:var(--s3)">
+      <div><div class="stat" style="border:0;background:none;padding:0"><div class="k">${mt.n>1?'Mediana de '+mt.n+' métodos':'Preço teto'}</div>
+        <div class="v" style="font-size:var(--t-xl)">${brl(mt.mediana)}</div></div></div>
+      <div style="text-align:right">${mt.preco?`<div class="stat" style="border:0;background:none;padding:0"><div class="k">Cotação · margem</div>
+        <div class="v ${sinalCls(mt.margem)}" style="font-size:var(--t-base)">${brl(Math.round(mt.preco))} · ${pctS(mt.margem,1)}</div></div>`:'<span class="hint">sem cotação para comparar</span>'}</div>
+    </div>`:''}
+    <div class="metodos" role="table" aria-label="Preço teto por método">
+      ${mt.lista.map(x=>`<div class="metodo" role="row">
+        <div role="cell"><b>${x.nome}</b><div class="hint" style="margin:0">${x.formula}</div></div>
+        <div role="cell" class="mval">${x.valor>0?`<span class="num" style="font-weight:600">${brl(x.valor)}</span>${x.margem!=null?`<span class="num ${sinalCls(x.margem)}" style="font-size:var(--t-xs)">${pctS(x.margem,1)}</span>`:''}`:`<span class="hint" style="margin:0">falta ${x.falta}</span>`}</div>
+        ${x.valor>0?`<div class="mbar" aria-hidden="true"><i class="${mt.preco&&mt.preco>x.valor?'acima':''}" style="width:${pos(x.valor)}"></i>${mt.preco?`<b style="left:${pos(mt.preco)}"></b>`:''}</div>`:''}
+      </div>`).join('')}
+    </div>
+    ${mt.preco&&disp.length?`<div class="legend" style="margin-top:var(--s2)"><div><i style="background:var(--good)"></i>teto acima da cotação</div><div><i style="background:var(--bad)"></i>teto abaixo da cotação</div><div><i style="background:var(--ink);width:2px"></i>cotação atual</div></div>`:''}
+    ${mt.dy!=null?`<div class="hint" style="margin-top:var(--s2)">Dividend yield atual (DPA ÷ cotação): <b>${pct(mt.dy,1)}</b></div>`:''}
+  </div>`;
+}
+function blocoRendimentos(a){
+  const r=a&&a.rendimentos?Object.entries(a.rendimentos).sort((x,y)=>x[0].localeCompare(y[0])).slice(-12):[];
+  if(!r.length)return '';
+  const media=r.reduce((s,[,v])=>s+v,0)/r.length;
+  const vRS=v=>'R$ '+(v/100).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:4});
+  return `<div class="card flat" style="padding:var(--s3) var(--s4);margin-bottom:var(--s4)">
+    <h3 style="margin-bottom:var(--s2)">Rendimentos por cota <span class="tag muted">${r.length} ${r.length>1?'meses':'mês'} · média ${vRS(media)}</span></h3>
+    ${barrasMeses(r.map(([ym,v])=>({l:ymShort(ym),v,t:vRS(v)})),{alt:'Rendimento por cota nos últimos meses',cor:'var(--c1)'})}
+  </div>`;
 }

@@ -111,7 +111,18 @@ function ligarBackup(el){
 
 /* ---------- navegação ---------- */
 const VIEWS={painel:renderPainel,lancar:renderLancar,faturas:renderFaturas,investir:renderInvestir,liberdade:renderLiberdade,config:renderConfig};
+/* retrato do patrimônio investido, um por mês (campo patrimonioHist, já existia vazio) */
+function registrarPatrimonio(){
+  if(!S.ativos.length&&!S.reservaAtual)return;
+  const ym=ymNow(), valor=patrimonioInvestido(), investido=totaisCarteira().investido;
+  if(!Array.isArray(S.patrimonioHist))S.patrimonioHist=[];
+  const h=S.patrimonioHist, i=h.findIndex(x=>x&&x.ym===ym);
+  const novo={ym,valor,investido:investido??null,em:todayISO()};
+  if(i<0){h.push(novo);salvar()}
+  else if(h[i].valor!==valor||h[i].investido!==novo.investido){h[i]=novo;salvar()}
+}
 function render(){
+  registrarPatrimonio();
   const tab=S.ui.tab in VIEWS?S.ui.tab:'painel';
   $$('.view').forEach(v=>v.classList.toggle('on',v.id==='v-'+tab));
   $$('nav.tabs button[data-tab]').forEach(b=>{if(b.dataset.tab===tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});

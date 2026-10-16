@@ -112,7 +112,15 @@ function lerArquivo(f){
   if(!f)return;
   const nome=f.name.toLowerCase();
   if(nome.endsWith('.xlsx')||nome.endsWith('.xls')){lerXLSX(f);return}
-  if(nome.endsWith('.pdf')){toast('De PDF, copie o texto das páginas de transações e cole no campo abaixo');return}
+  if(nome.endsWith('.pdf')){
+    toast('Lendo o PDF…');
+    lerPdfComSenha(f,({texto,paginas})=>{
+      $('#impTexto').value=texto.slice(0,200000);
+      toast('PDF lido: '+paginas.length+' página'+(paginas.length>1?'s':'')+' — conferindo lançamentos');
+      importar();
+    });
+    return;
+  }
   const r=new FileReader();
   r.onload=()=>{$('#impTexto').value=r.result.slice(0,200000);toast('Arquivo lido — confira e toque em Ler lançamentos')};
   r.readAsText(f,'utf-8');
@@ -254,29 +262,49 @@ function parseOFX(t){
 }
 function revisarImportacao(){
   const{unicas,dup,competencia}=impLinhas;
-  const tot=unicas.reduce((a,t)=>a+Math.abs(t.valor),0);
-  const parc=unicas.filter(t=>t.parcelaDe>1).length;
-  sheet(`<h2 id="sheetTitulo">Revisar importação</h2>
-  <div class="sh-sub">${unicas.length} lançamentos novos · ${brl(tot)} · fatura de ${ymLabel(competencia)}${dup?` · ${dup} duplicados ignorados`:''}</div>
-  ${parc?`<div class="warnbox" style="margin-bottom:11px">${parc} compras parceladas — as parcelas futuras serão lançadas automaticamente nos meses seguintes.</div>`:''}
-  <div class="list" style="max-height:44vh;overflow-y:auto">
+  const marcado=unicas.map(()=>true);
+  const cats=S.categorias.filter(x=>x.tipo!=='receita');
+  sheet(`<h2>Revisar importação</h2>
+  <div class="sh-sub" id="impResumo"></div>
+  <div class="card flat" style="padding:var(--s3) var(--s4);margin-bottom:var(--s3)"><h3 style="margin-bottom:var(--s1)">Gastos por categoria</h3><div id="impCats"></div></div>
+  <div id="impParc"></div>
+  <div class="row" style="margin-bottom:var(--s2)"><span class="sub">Desmarque o que não for gasto (ex.: pagamento, estorno).</span>
+    <button class="btn ghost sm" id="impTodos">Desmarcar todos</button></div>
+  <div class="list" style="max-height:40vh;overflow-y:auto" id="impLista">
     ${unicas.map((t,i)=>{const c=catById(t.catId);return `<div class="item">
-      <div class="ic">${c.ic}</div>
+      <input type="checkbox" class="impchk" data-i="${i}" checked aria-label="Importar ${esc(t.desc)}" style="width:18px;height:18px;accent-color:var(--accent);flex:none">
+      <div class="ic" aria-hidden="true">${c.ic}</div>
       <div class="mid"><div class="t">${esc(t.desc)}</div>
-        <div class="s">${dLabel(t.data)} · <select data-i="${i}" class="impcat" aria-label="Categoria de ${esc(t.desc)}" style="background:none;border:0;color:var(--accent);font-weight:650;font-size:11.5px;padding:0">${S.categorias.filter(x=>x.tipo!=='receita').map(x=>`<option value="${x.id}" ${x.id===t.catId?'selected':''}>${x.nome}</option>`).join('')}</select>
+        <div class="s">${dLabel(t.data)} · <select data-i="${i}" class="impcat" aria-label="Categoria de ${esc(t.desc)}" style="background:none;border:0;color:var(--accent);font-weight:650;font-size:11.5px;padding:0">${cats.map(x=>`<option value="${x.id}" ${x.id===t.catId?'selected':''}>${esc(x.nome)}</option>`).join('')}</select>
         ${t.parcelaDe>1?` · <b style="color:var(--warn)">${t.parcelaN}/${t.parcelaDe}</b>`:''}</div></div>
       <div class="val ${sinalCls(t.valor)}">${t.valor<0?'−':'+'}${brl(Math.abs(t.valor),{noPrefix:true})}</div></div>`}).join('')}
   </div>
-  <button class="btn" id="impConfirma" style="margin-top:13px">Confirmar ${unicas.length} lançamentos</button>`);
+  <button class="btn" id="impConfirma" style="margin-top:var(--s3)"></button>`);
+  const escolhidas=()=>unicas.filter((t,i)=>marcado[i]);
+  function atualizar(){
+    const sel=escolhidas(), tot=sel.reduce((a,t)=>a+Math.abs(t.valor),0), parc=sel.filter(t=>t.parcelaDe>1).length;
+    $('#impResumo').textContent=`${sel.length} de ${unicas.length} lançamentos · ${brl(tot)} · fatura de ${ymLabel(competencia)}${dup?` · ${dup} duplicados ignorados`:''}`;
+    const m={};sel.filter(t=>t.valor<0).forEach(t=>{m[t.catId]=(m[t.catId]||0)-t.valor});
+    const lista=Object.entries(m).map(([id,v])=>({n:catById(id).ic+'  '+catById(id).nome,v})).sort((a,b)=>b.v-a.v);
+    const totG=lista.reduce((a,x)=>a+x.v,0);
+    $('#impCats').innerHTML=lista.length?barrasH(lista.slice(0,6),{tot:totG}):'<div class="sub">Nenhum gasto marcado.</div>';
+    $('#impParc').innerHTML=parc?`<div class="warnbox" style="margin-bottom:var(--s3)">${parc} compra${parc>1?'s':''} parcelada${parc>1?'s':''} — as parcelas futuras serão lançadas sozinhas nos meses seguintes.</div>`:'';
+    const b=$('#impConfirma');b.textContent=`Confirmar ${sel.length} lançamento${sel.length===1?'':'s'}`;b.disabled=!sel.length;
+    $('#impTodos').textContent=sel.length?'Desmarcar todos':'Marcar todos';
+  }
+  atualizar();
+  $$('.impchk').forEach(c=>c.onchange=e=>{marcado[+e.target.dataset.i]=e.target.checked;atualizar()});
+  $('#impTodos').onclick=()=>{const v=!escolhidas().length;marcado.fill(v);$$('.impchk').forEach(c=>c.checked=v);atualizar()};
   $$('.impcat').forEach(s=>s.onchange=e=>{
-    const t=unicas[+e.target.dataset.i];t.catId=e.target.value;S.aprendizado[chaveEstab(t.desc)]=t.catId;
+    const t=unicas[+e.target.dataset.i];t.catId=e.target.value;S.aprendizado[chaveEstab(t.desc)]=t.catId;atualizar();
   });
   $('#impConfirma').onclick=()=>{
-    S.transacoes.push(...unicas);
-    S.transacoes.push(...projetarParcelas(unicas));
-    unicas.forEach(t=>{if(t.catId!=='outros')S.aprendizado[chaveEstab(t.desc)]=t.catId});
+    const sel=escolhidas();if(!sel.length)return;
+    S.transacoes.push(...sel);
+    S.transacoes.push(...projetarParcelas(sel));
+    sel.forEach(t=>{if(t.catId!=='outros')S.aprendizado[chaveEstab(t.desc)]=t.catId});
     salvar();fecharSheet();render();
-    toast(unicas.length+' lançamentos importados');
+    toast(sel.length+' lançamentos importados');
     $('#impTexto')&&($('#impTexto').value='');
   };
 }

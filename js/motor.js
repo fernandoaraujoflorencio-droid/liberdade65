@@ -185,6 +185,50 @@ function barrasV(serie,opt={}){
   });
   return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block" role="img" aria-label="${esc(opt.alt||'Composição do patrimônio')}">${out}</svg>`;
 }
+/* barras verticais por mês (uma série): [{l, v, t?}] — t é o texto da dica */
+function barrasMeses(serie,opt={}){
+  const W=320,H=112,pad={t:14,b:16};
+  const n=serie.length; if(!n)return '';
+  const max=Math.max(...serie.map(s=>s.v),1);
+  const passo=W/n, bw=Math.min(28,passo*.62);
+  let out='';
+  serie.forEach((s,i)=>{
+    const h=Math.max(1,(s.v/max)*(H-pad.t-pad.b)), x=i*passo+(passo-bw)/2, y=H-pad.b-h;
+    out+=`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="3" fill="${opt.cor||'var(--c1)'}" opacity="${i===n-1?1:.72}"><title>${esc(s.l)}: ${esc(s.t||brl(s.v))}</title></rect>`;
+    if(n<=12)out+=`<text x="${(x+bw/2).toFixed(1)}" y="${H-3}" text-anchor="middle" font-size="8" fill="var(--ink-3)" font-family="Public Sans, system-ui, sans-serif">${esc(s.l)}</text>`;
+  });
+  const ult=serie[n-1];
+  out+=`<text x="${W}" y="9" text-anchor="end" font-size="9" fill="var(--ink-2)" font-family="IBM Plex Mono, ui-monospace, Consolas, monospace" font-weight="600">${esc(ult.t||brl(ult.v))}</text>`;
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block" role="img" aria-label="${esc(opt.alt||'Barras por mês')}">${out}</svg>`;
+}
+/* barras agrupadas por mês: series=[{n,cor}], meses=[{l, vals:[...]}] */
+function barrasGrupo(meses,series,opt={}){
+  const W=320,H=128,pad={t:6,b:16};
+  const max=Math.max(1,...meses.flatMap(m=>m.vals));
+  const passo=W/meses.length, k=series.length, bw=Math.min(12,(passo*.78)/k);
+  let out='';
+  [.5,1].forEach(f=>{const y=(pad.t+(1-f)*(H-pad.t-pad.b)).toFixed(1);out+=`<line class="gridline" x1="0" x2="${W}" y1="${y}" y2="${y}"/>`});
+  meses.forEach((m,i)=>{
+    const x0=i*passo+(passo-bw*k-(k-1)*2)/2;
+    m.vals.forEach((v,j)=>{
+      const h=Math.max(v>0?1:0,(v/max)*(H-pad.t-pad.b)), x=x0+j*(bw+2);
+      out+=`<rect x="${x.toFixed(1)}" y="${(H-pad.b-h).toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="2" fill="${series[j].cor}"><title>${esc(m.l)} · ${esc(series[j].n)}: ${brl(v)}</title></rect>`;
+    });
+    out+=`<text x="${(i*passo+passo/2).toFixed(1)}" y="${H-3}" text-anchor="middle" font-size="8" fill="var(--ink-3)" font-family="Public Sans, system-ui, sans-serif">${esc(m.l)}</text>`;
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block" role="img" aria-label="${esc(opt.alt||'Comparação por mês')}">${out}</svg>
+    <div class="legend">${series.map(s=>`<div><i style="background:${s.cor}"></i>${esc(s.n)}</div>`).join('')}</div>`;
+}
+/* série dos últimos n meses (até o mês ym): entradas, gastos, aportes */
+function serieMeses(ym,n=6){
+  const out=[];
+  for(let i=n-1;i>=0;i--){
+    const m=addMonthYM(ym,-i);
+    const ent=txDoMes(m).filter(t=>t.valor>0).reduce((a,t)=>a+t.valor,0);
+    out.push({ym:m,l:MES3[+m.slice(5)-1],vals:[ent,despesasDoMes(m),aportesDoMes(m)]});
+  }
+  return out;
+}
 /* arco de progresso da taxa de poupança */
 function gauge(valor,meta,opt={}){
   const W=150,H=86,cx=75,cy=76,R=62;

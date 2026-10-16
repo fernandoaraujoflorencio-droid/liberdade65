@@ -124,7 +124,8 @@ const DEFAULT={
   v:1,
   perfil:{nome:'',rendaLiquida:0,outrasRendas:0,metaPoupanca:.65,diaPagamento:5,despesaMediaManual:0},
   premissas:{swr:.04,retornoRealAA:.06,inflacaoAA:.045,cdiAA:.1065,dyCarteira:.08,mesesReserva:6,idadeAtual:30,idadeCoast:60,
-    taxaBazin:.06 /* novo: taxa mínima do preço teto de Bazin */},
+    taxaBazin:.06, /* novos: premissas do preço teto */
+    taxaFII:.08,gordonK:.12,gordonG:.03,pvpMax:1,plAlvo:10},
   categorias:CAT_PADRAO.map(c=>({...c})),
   cartoes:[],
   transacoes:[],

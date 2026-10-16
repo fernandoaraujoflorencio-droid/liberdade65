@@ -343,6 +343,24 @@ details.acc .body{padding:0 14px 14px;font-size:13px;color:var(--ink-2);line-hei
 .teto{display:flex;justify-content:space-between;align-items:center;gap:var(--s2);padding:var(--s2) 0;border-bottom:1px solid var(--line);font-size:var(--t-sm)}
 .teto:last-child{border-bottom:0}
 
+.pilha{display:flex;flex-direction:column;gap:var(--s3);min-width:0}
+@media (min-width:960px){.pilha{gap:var(--s4)}}
+/* preço teto por método */
+.metodos{display:flex;flex-direction:column}
+.metodo{display:grid;grid-template-columns:1fr auto;gap:2px var(--s3);padding:var(--s2) 0;border-bottom:1px solid var(--line);font-size:var(--t-sm)}
+.metodo:last-child{border-bottom:0}
+.metodo .mval{display:flex;flex-direction:column;align-items:flex-end;justify-content:center}
+.mbar{grid-column:1 / -1;position:relative;height:6px;background:var(--sunken);border-radius:var(--r-pill);margin-top:4px}
+.mbar i{position:absolute;left:0;top:0;bottom:0;border-radius:var(--r-pill);background:var(--good)}
+.mbar i.acima{background:var(--bad)}
+.mbar b{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--ink);border-radius:2px}
+/* atual × alvo por classe */
+.alvos{display:flex;flex-direction:column;gap:var(--s3)}
+.alvo .row{font-size:var(--t-sm);margin-bottom:4px}
+.alvo .trk{position:relative;height:8px;background:var(--sunken);border-radius:var(--r-pill)}
+.alvo .trk i{position:absolute;left:0;top:0;bottom:0;border-radius:var(--r-pill)}
+.alvo .trk b{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--ink);border-radius:2px}
+
 /* ============ TELAS ESTREITAS ============ */
 @media (max-width:380px){
   .hero .big{font-size:34px}

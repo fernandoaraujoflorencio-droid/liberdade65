@@ -59,6 +59,13 @@ function renderPainel(){
     </div>
   </div>
 
+  ${(()=>{const sm=serieMeses(ym,6);const tem=sm.some(m=>m.vals.some(v=>v>0));
+    return `<div class="card"><h3>Últimos 6 meses <span class="tag muted">até ${ymShort(ym)}</span></h3>
+    ${tem?barrasGrupo(sm,[{n:'Entradas',cor:'var(--good)'},{n:'Gastos',cor:'var(--bad)'},{n:'Aportes',cor:'var(--c3)'}],{alt:'Entradas, gastos e aportes nos últimos 6 meses'})
+      +(()=>{const g=sm.map(m=>m.vals[1]).filter(v=>v>0);const med=g.length?Math.round(g.reduce((a,b)=>a+b,0)/g.length):0;
+        return med?`<div class="sub" style="margin-top:var(--s2)">Gasto médio: <b class="num" style="color:var(--ink)">${brl(med)}</b>/mês · este mês ${o.gasto>med?'<span class="neg">acima</span>':'<span class="pos">abaixo</span>'} da média</div>`:''})()
+      :'<div class="sub">O gráfico aparece quando houver lançamentos nos meses anteriores.</div>'}</div>`})()}
+
   ${ins.length?`<div class="card"><h3>O que eu olharia primeiro</h3><div class="list">
     ${ins.map(i=>`<div class="item" style="align-items:flex-start">
       <div class="ic" aria-hidden="true" style="background:var(--${i.t==='ok'?'good':i.t==='bad'?'bad':i.t==='warn'?'warn':'sunken'}-soft, var(--sunken))">${i.ic}</div>
@@ -77,7 +84,7 @@ function renderPainel(){
   </div>`:`<div class="card">${vazio({ic:'lista',t:'Nenhum gasto em '+ymLabel(ym),
       p:'Lance um gasto pelo botão <b>+</b> ou importe a fatura do cartão para ver para onde vai o dinheiro.',acao:'Importar fatura',attrs:'data-goto="faturas"'})}</div>`}
 
-  <div class="card">
+  <div class="card span2">
     <h3>Rumo à liberdade</h3>
     <div class="row" style="align-items:flex-end;margin-bottom:9px">
       <div class="stat" style="border:0;background:none;padding:0">
@@ -200,14 +207,14 @@ function renderFaturas(){
 
   <div class="card">
     <h3>Importar fatura</h3>
-    ${temCartao?`<div class="sub" style="margin-bottom:var(--s3)">Aceito o <b>CSV/XLSX</b> que o Nubank exporta, o <b>texto do PDF</b> da fatura ou qualquer lista com data, descrição e valor. As parcelas futuras são criadas sozinhas.</div>
+    ${temCartao?`<div class="sub" style="margin-bottom:var(--s3)">Escolha o <b>PDF da fatura</b> (eu leio sozinho, sem o arquivo sair do computador), o <b>CSV/XLSX</b> que o Nubank exporta ou cole qualquer lista com data, descrição e valor. Você confere tudo antes de gravar, e as parcelas futuras são criadas sozinhas.</div>
     <div class="grid2">
       <div class="fgroup"><label class="f" for="impCartao">Cartão</label>
         <select class="inp" id="impCartao">${S.cartoes.map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join('')}</select></div>
       <div class="fgroup"><label class="f" for="impMes">Mês do ciclo</label>
         <input class="inp" type="month" id="impMes" value="${ym}"></div>
     </div>
-    <div class="fgroup"><label class="f" for="impArq">Arquivo (.csv .xlsx .txt .ofx)</label>
+    <div class="fgroup"><label class="f" for="impArq">Arquivo da fatura (.pdf .csv .xlsx .ofx .txt)</label>
       <input class="inp" type="file" id="impArq" accept=".csv,.xlsx,.xls,.txt,.ofx,.pdf"></div>
     <div class="fgroup"><label class="f" for="impTexto">Ou cole o conteúdo aqui</label>
       <textarea class="inp" id="impTexto" placeholder="29 JUL •••• 1234 Mercado*Mercadolivre - Parcela 2/10 R$ 369,99&#10;03 AGO Google Youtube R$ 7,99"></textarea></div>
@@ -239,20 +246,23 @@ function renderInvestir(){
   el.innerHTML=`
   ${cardAtivos()}
 
+  <div class="pilha">${cardEvolucao()}${cardProventos(F,P)}</div>
+
   <div class="card">
     <h3>Carteira por classe <span class="tag muted">${S.ativos.length} ativo${S.ativos.length===1?'':'s'}</span></h3>
     ${tot>0?`<div class="donutrow">
       ${donut(dados,{lab:'CARTEIRA',centro:brlK(tot),alt:'Carteira por classe de ativo'})}
       <div style="flex:1;min-width:0" class="legend col">
         ${dados.map((d,i)=>`<div style="width:100%"><i style="background:${COR[i%6]}"></i><span style="flex:1">${esc(d.n)}</span><b class="num" style="color:var(--ink)">${pct(d.v/tot,0)}</b></div>`).join('')}
-      </div></div>`
-    :vazio({ic:'carteira',t:'Carteira vazia',p:'Cadastre o que você já tem investido — ou importe um CSV — para o plano de liberdade ficar real.',acao:'+ Adicionar ativo',attrs:'data-add-ativo'})}
+      </div></div>
     <div class="hair"></div>
-    <div class="grid2">
-      <div class="stat"><div class="k">Renda passiva ${pct(P.swr,0)} a.a.</div><div class="v pos">${brl(F.rendaPassiva)}</div><div class="d">por mês, sem tocar no principal</div></div>
-      <div class="stat"><div class="k">Se viver de dividendos</div><div class="v">${brl(F.rendaPassivaDY)}</div><div class="d">a ${pct(P.dyCarteira,1)} de DY ao ano</div></div>
-    </div>
-    ${tot>0?`<button class="btn ghost sm block" style="margin-top:var(--s3)" data-add-ativo>+ Adicionar ativo</button>`:''}
+    <div class="sub" style="margin-bottom:var(--s3)">Atual × alvo <span class="muted">(o traço é o alvo)</span></div>
+    <div class="alvos">${reb.linhas.filter(l=>l.valor>0||l.alvoP>0).map(l=>{const ci=Math.max(0,dados.findIndex(d=>d.n===l.classe));
+      return `<div class="alvo"><div class="row"><span>${esc(l.classe)}</span><span class="num"><b>${pct(l.pAtual,0)}</b> <span class="muted">/ ${pct(l.alvoP,0)}</span></span></div>
+      <div class="trk" role="img" aria-label="${esc(l.classe)}: ${pct(l.pAtual,0)} hoje, alvo ${pct(l.alvoP,0)}"><i style="width:${Math.min(100,l.pAtual*100).toFixed(1)}%;background:${l.valor>0?COR[ci%6]:'var(--line-strong)'}"></i><b style="left:${Math.min(100,l.alvoP*100).toFixed(1)}%"></b></div></div>`}).join('')}</div>
+    <button class="btn ghost sm block" style="margin-top:var(--s4)" data-add-ativo>+ Adicionar ativo</button>`
+    :vazio({ic:'carteira',t:'Carteira vazia',p:'Cadastre o que você já tem investido — ou importe um CSV ou os relatórios gerenciais — para o plano de liberdade ficar real.',acao:'+ Adicionar ativo',attrs:'data-add-ativo'})
+      +`<div class="btnrow" style="justify-content:center"><button class="btn ghost sm" id="btnImpCsv">Importar CSV</button><button class="btn ghost sm" id="btnImpRel">Relatórios</button></div>`}
   </div>
 
   <div class="card">
@@ -444,9 +454,9 @@ function renderLiberdade(){
 }
 
 /* ---------- config ---------- */
-function campoCfg(k,label,{money,pctn,pctSel,tipo,valor,ph,hint}={}){
+function campoCfg(k,label,{money,pctn,pctSel,tipo,step,valor,ph,hint}={}){
   const id='cfg-'+k.replace(/\./g,'-');
-  const attrs=`class="inp cfg" id="${id}" data-k="${k}" ${money?'data-money="1" inputmode="decimal"':''} ${pctn?'data-pctn="1" inputmode="decimal"':''} ${tipo?`type="${tipo}"`:''}`;
+  const attrs=`class="inp cfg" id="${id}" data-k="${k}" ${money?'data-money="1" inputmode="decimal"':''} ${pctn?'data-pctn="1" inputmode="decimal"':''} ${tipo?`type="${tipo}"`:''} ${step?`step="${step}" inputmode="decimal"`:''}`;
   return `<div class="fgroup"><label class="f" for="${id}">${label}</label>
     <input ${attrs} value="${esc(valor)}" ${ph?`placeholder="${esc(ph)}"`:''} ${hint?`aria-describedby="${id}-h"`:''}>
     ${hint?`<div class="hint" id="${id}-h">${hint}</div>`:''}</div>`;
@@ -485,9 +495,20 @@ function renderConfig(){
       ${campoCfg('premissas.dyCarteira','DY da carteira a.a. (%)',{pctn:1,valor:pv(P.dyCarteira)})}
       ${campoCfg('premissas.mesesReserva','Meses de reserva',{tipo:'number',valor:P.mesesReserva})}
       ${campoCfg('premissas.idadeCoast','Idade Coast FIRE',{tipo:'number',valor:P.idadeCoast})}
-      ${typeof P.taxaBazin==='number'?campoCfg('premissas.taxaBazin','Taxa mínima Bazin (%)',{pctn:1,valor:pv(P.taxaBazin),hint:'Preço teto = DPA ÷ esta taxa'}):''}
     </div>
     <div class="sub">Retorno <b>real</b> = acima da inflação. 6% reais ≈ IPCA+6, próximo do juro longo brasileiro. Taxa de retirada entre 3,5% e 4% é o consenso conservador.</div>
+  </div>
+  <div class="card">
+    <h3>Preço teto</h3>
+    <div class="grid2">
+      ${campoCfg('premissas.taxaBazin','Bazin — ações (%)',{pctn:1,valor:pv(P.taxaBazin),hint:'DY mínimo: teto = DPA ÷ taxa'})}
+      ${campoCfg('premissas.taxaFII','Bazin — FIIs (%)',{pctn:1,valor:pv(P.taxaFII),hint:'DY mínimo para fundos'})}
+      ${campoCfg('premissas.gordonK','Gordon — retorno exigido (%)',{pctn:1,valor:pv(P.gordonK)})}
+      ${campoCfg('premissas.gordonG','Gordon — crescimento (%)',{pctn:1,valor:pv(P.gordonG),hint:'Precisa ser menor que o retorno'})}
+      ${campoCfg('premissas.pvpMax','P/VP máximo (FIIs)',{tipo:'number',step:'0.05',valor:P.pvpMax})}
+      ${campoCfg('premissas.plAlvo','P/L justo (ações)',{tipo:'number',step:'0.5',valor:P.plAlvo})}
+    </div>
+    <div class="sub">Cada ativo mostra o preço teto por método e a <b>mediana</b> entre eles. Importe os relatórios gerenciais em Investir → Ativos → Relatórios para eu preencher DPA, VP e LPA.</div>
   </div>
   <div class="card">
     <h3>Cotações automáticas</h3>
@@ -527,3 +548,24 @@ function renderConfig(){
   ligarBackup(el);
 }
 function abrirConfigRenda(){irPara('config');setTimeout(()=>$('#cfg-perfil-rendaLiquida')?.focus(),80)}
+
+/* ---------- cards extras do Investir ---------- */
+function cardEvolucao(){
+  const h=(S.patrimonioHist||[]).filter(x=>x&&x.ym&&x.valor>=0).sort((a,b)=>a.ym.localeCompare(b.ym)).slice(-24);
+  const ult=h[h.length-1], prim=h[0];
+  return `<div class="card"><h3>Evolução do patrimônio ${h.length>1?`<span class="tag ${sinalCls(ult.valor-prim.valor)}">${brlS(ult.valor-prim.valor)} desde ${ymShort(prim.ym)}</span>`:''}</h3>
+    ${h.length>1?areaChart(h.map(x=>({l:ymShort(x.ym),v:x.valor})),{alt:'Evolução mensal do patrimônio investido'})
+      :`<div class="sub">Eu guardo um retrato do patrimônio investido a cada mês. O gráfico aparece a partir do 2º mês${ult?` — hoje: <b class="num" style="color:var(--ink)">${brl(ult.valor)}</b>`:''}.</div>`}
+  </div>`;
+}
+function cardProventos(F,P){
+  const itens=S.ativos.filter(a=>a.qtd>0&&a.dpa>0).map(a=>({n:a.ticker||a.nome,v:Math.round(a.qtd*a.dpa)})).sort((a,b)=>b.v-a.v);
+  const ano=itens.reduce((s,x)=>s+x.v,0);
+  return `<div class="card"><h3>Renda passiva</h3>
+    <div class="grid2">
+      <div class="stat"><div class="k">Proventos estimados</div><div class="v pos">${ano?brl(Math.round(ano/12)):'—'}</div><div class="d">${ano?'por mês · '+brl(ano)+'/ano pelo DPA':'informe o DPA ou importe relatórios'}</div></div>
+      <div class="stat"><div class="k">Regra dos ${pct(P.swr,0)}</div><div class="v">${brl(F.rendaPassiva)}</div><div class="d">por mês, sem tocar no principal</div></div>
+    </div>
+    ${itens.length?`<div class="hair"></div><div class="sub" style="margin-bottom:var(--s2)">Quem paga mais por ano</div>${barrasH(itens.slice(0,6),{tot:ano})}`:''}
+  </div>`;
+}
