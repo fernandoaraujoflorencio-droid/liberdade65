@@ -1,0 +1,3 @@
+# nunca publicar backups com dados pessoais
+liberdade65-backup-*.json
+*.json

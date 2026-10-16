@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#F3F5F4">
+<meta name="description" content="Liberdade 65 — controle de gastos, faturas, carteira e plano de liberdade financeira. Os dados ficam só neste navegador.">
+<title>Liberdade 65</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%237A5810'/%3E%3Ctext x='32' y='42' font-family='Arial' font-weight='700' font-size='28' fill='white' text-anchor='middle'%3E65%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..110,400..800&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<a class="skip" href="#conteudo">Pular para o conteúdo</a>
+
+<div id="app">
+  <header class="top">
+    <h1 class="viewtitle" id="viewTitle">Painel</h1>
+    <div class="toprow">
+      <div class="brand"><span class="logo" aria-hidden="true">65</span><b>Liberdade 65</b><span id="brandsub">meta 65%</span></div>
+      <button class="iconbtn" id="btnTheme" title="Alternar tema" aria-label="Alternar tema"></button>
+      <button class="iconbtn" id="btnCfg" title="Configurações" aria-label="Configurações">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 9 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 9a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg>
+      </button>
+    </div>
+    <div class="monthbar" role="group" aria-label="Mês">
+      <button id="mPrev" aria-label="Mês anterior">‹</button>
+      <div class="mlabel" id="mLabel" aria-live="polite">—<small id="mSmall">período</small></div>
+      <button id="mNext" aria-label="Próximo mês">›</button>
+    </div>
+  </header>
+
+  <main id="conteudo" tabindex="-1">
+    <section class="view on" id="v-painel" aria-label="Painel"></section>
+    <section class="view" id="v-lancar" aria-label="Lançamentos"></section>
+    <section class="view" id="v-faturas" aria-label="Faturas"></section>
+    <section class="view" id="v-investir" aria-label="Investir"></section>
+    <section class="view" id="v-liberdade" aria-label="Liberdade"></section>
+    <section class="view" id="v-config" aria-label="Configurações"></section>
+  </main>
+
+  <button class="fab" id="fab" aria-label="Novo lançamento" title="Novo lançamento">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>
+  </button>
+</div>
+
+<nav class="tabs" aria-label="Navegação principal"><div class="inner">
+  <div class="navbrand"><span class="logo" aria-hidden="true">65</span><div><b>Liberdade 65</b><span>controle financeiro</span></div></div>
+  <button data-tab="painel" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 13h4l2.5 6L14 5l2.5 8H21"/></svg><span>Painel</span></button>
+  <button data-tab="lancar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M7.5 9h9M7.5 13h6M7.5 16.5h4"/></svg><span>Lançar</span></button>
+  <button data-tab="faturas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5.5" width="19" height="13" rx="2.5"/><path d="M2.5 10h19M6.5 14.5h3"/></svg><span>Faturas</span></button>
+  <button data-tab="investir"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V9M9.6 19V5M15.2 19v-6M20.8 19v-9"/></svg><span>Investir</span></button>
+  <button data-tab="liberdade"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21c4.4-3.3 7-6.6 7-10a7 7 0 1 0-14 0c0 3.4 2.6 6.7 7 10z"/><circle cx="12" cy="10.6" r="2.5"/></svg><span>Liberdade</span></button>
+  <div class="spacer desk-only" aria-hidden="true"></div>
+  <button data-tab="config" class="desk-only"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1"/></svg><span>Configurações</span></button>
+</div></nav>
+
+<div class="sheet" id="sheet"><div class="scrim" data-close></div>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="sheetTitulo" tabindex="-1">
+    <div class="grab" aria-hidden="true"></div>
+    <button class="iconbtn fechar" data-close aria-label="Fechar" title="Fechar (Esc)"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <div id="sheetBody"></div>
+  </div>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<!-- Cotações do robô do GitHub (plano B). Se o arquivo não existir, o app segue normal. -->
+<script src="cotacoes.js"></script>
+<!-- Ordem importa: scripts clássicos (funcionam abrindo o arquivo pelo computador) -->
+<script src="js/nucleo.js"></script>
+<script src="js/motor.js"></script>
+<script src="js/importacao.js"></script>
+<script src="js/carteira.js"></script>
+<script src="js/telas.js"></script>
+<script src="js/folhas.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
