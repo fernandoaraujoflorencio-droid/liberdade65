@@ -286,7 +286,7 @@ function abrirAtivo(id){
       <div class="fgroup"><label class="f" for="atLpa">LPA</label><input class="inp" id="atLpa" inputmode="decimal" value="${a?campoMoney(a.lpa):''}" placeholder="R$"></div>
       <div class="fgroup"><label class="f" for="atVpa">VPA / VP cota</label><input class="inp" id="atVpa" inputmode="decimal" value="${a?campoMoney(a.vpa):''}" placeholder="R$"></div>
     </div>
-    ${a?.dpaFonte?`<div class="okbox" style="margin-bottom:var(--s2)">DPA calculado de <b>${a.dpaFonte.meses} ${a.dpaFonte.meses>1?'meses':'mês'} de rendimentos</b>${a.dpaFonte.estimado?' (média × 12 até completar 12 meses)':' (soma dos últimos 12 meses)'}.</div>`:''}
+    ${a?.dpaFonte?`<div class="okbox" style="margin-bottom:var(--s2)">${a.dpaFonte.relatorio?'DPA dos <b>últimos 12 meses informado no relatório gerencial</b>.':`DPA calculado de <b>${a.dpaFonte.meses} ${a.dpaFonte.meses>1?'meses':'mês'} de rendimentos</b>${a.dpaFonte.estimado?' (média × 12 até completar 12 meses)':' (soma dos últimos 12 meses)'}.`}</div>`:''}
     <b>DPA</b> = dividendos por ação/cota pagos nos últimos 12 meses. <b>LPA</b> = lucro por ação. <b>VPA</b> = valor patrimonial por ação (nos FIIs, VP por cota). O jeito mais fácil é <b>importar os relatórios gerenciais</b> — eu preencho para você. As taxas de cada método mudam em Configurações.
   </div></details>
   <button class="btn" id="atSalvar">${a?'Salvar':'Adicionar'}</button>

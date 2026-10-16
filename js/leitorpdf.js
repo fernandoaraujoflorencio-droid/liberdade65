@@ -33,11 +33,13 @@ async function lerTextoPDF(arquivo,senha){
     x.tipo=e&&e.name==='PasswordException'?(senha?'senha-errada':'senha'):'pdf';
     throw x;
   }
-  const paginas=[];
+  const paginas=[], itens=[];
   for(let n=1;n<=doc.numPages;n++){
     const pg=await doc.getPage(n);
     const tc=await pg.getTextContent();
     const porY=new Map();
+    /* itens com posição (x, y, largura, altura) para ler tabelas pela coluna */
+    itens.push(tc.items.filter(it=>it.str&&it.str.trim()).map(it=>({s:it.str,x:it.transform[4],y:it.transform[5],w:it.width||0,h:Math.abs(it.transform[3])||8})));
     for(const it of tc.items){
       if(!it.str||!it.str.trim())continue;
       const y=Math.round(it.transform[5]/2)*2, x=it.transform[4];
@@ -57,7 +59,7 @@ async function lerTextoPDF(arquivo,senha){
   }
   const texto=paginas.map(p=>p.join('\n')).join('\n');
   if(texto.replace(/\s/g,'').length<20){const x=new Error('sem texto');x.tipo='sem-texto';throw x}
-  return{paginas,texto};
+  return{paginas,texto,itens};
 }
 const MSG_PDF={
   'senha':'Este PDF tem senha. Digite a senha para eu ler (ela não é guardada).',
