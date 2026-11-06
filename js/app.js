@@ -131,6 +131,11 @@ function render(){
   $('#mLabel').childNodes[0].textContent=ymLabel(S.ui.ym);
   $('#mSmall').textContent=S.ui.ym===ymNow()?'mês atual':(S.ui.ym>ymNow()?'projeção':'fechado');
   VIEWS[tab]();
+  /* botão +: na aba Investir lança investimento; nas outras, gasto/receita */
+  const fab=$('#fab'), inv=tab==='investir';
+  fab.setAttribute('aria-label',inv?'Novo lançamento de investimento':'Novo lançamento');
+  fab.title=inv?'Comprar, vender, aplicar ou resgatar':'Novo gasto, receita ou aporte';
+  fab.onclick=()=>inv?abrirMovimento():abrirTx();
 }
 function irPara(tab){
   S.ui.tab=tab;salvar();render();scrollTo({top:0});
@@ -143,15 +148,14 @@ document.body.addEventListener('click',e=>{
 $$('nav.tabs button[data-tab]').forEach(b=>b.onclick=()=>irPara(b.dataset.tab));
 $('#mPrev').onclick=()=>{S.ui.ym=addMonthYM(S.ui.ym,-1);salvar();render()};
 $('#mNext').onclick=()=>{S.ui.ym=addMonthYM(S.ui.ym,1);salvar();render()};
-$('#fab').onclick=()=>abrirTx();
 $('#btnCfg').onclick=()=>irPara('config');
 
 /* tema: automático (segue o sistema) → escuro → claro */
-const TEMA_ROTULO={'':'automático','dark':'escuro','light':'claro'};
+const TEMA_ROTULO={'':'automático','dark':'escuro','amoled':'AMOLED (preto)','light':'claro'};
 function aplicarTema(t){
   if(t)document.documentElement.dataset.theme=t;else delete document.documentElement.dataset.theme;
   const b=$('#btnTheme');
-  b.innerHTML=svgIc(t==='dark'?'lua':t==='light'?'sol':'auto',18);
+  b.innerHTML=svgIc(t==='dark'||t==='amoled'?'lua':t==='light'?'sol':'auto',18);
   b.setAttribute('aria-label','Tema: '+TEMA_ROTULO[t]+'. Alternar tema');
   b.title='Tema '+TEMA_ROTULO[t];
   const meta=document.querySelector('meta[name=theme-color]');
@@ -159,7 +163,7 @@ function aplicarTema(t){
 }
 $('#btnTheme').onclick=()=>{
   const cur=S.ui.tema||'';
-  const next=cur===''?'dark':(cur==='dark'?'light':'');
+  const ordem=['','dark','amoled','light'], next=ordem[(ordem.indexOf(cur)+1)%ordem.length];
   S.ui.tema=next;salvar();aplicarTema(next);toast('Tema '+TEMA_ROTULO[next]);
 };
 

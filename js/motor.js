@@ -273,6 +273,12 @@ function insights(ym){
     out.push({t:'warn',ic:'🎯',h:'Taxa de poupança em '+pct(o.taxa,0),p:'Faltam '+brl(Math.max(0,o.metaValor-o.guardado))+' para fechar o mês nos '+pct(S.perfil.metaPoupanca,0)+'. Cortar aqui vale mais que render 1% a mais na carteira.'});
   if(o.renda>0&&o.taxa>=S.perfil.metaPoupanca)
     out.push({t:'ok',ic:'✅',h:'Meta de '+pct(S.perfil.metaPoupanca,0)+' cumprida',p:'Sobra de '+brl(o.guardado)+' neste mês. Transfira para a carteira ainda hoje — dinheiro parado na conta corrente vira gasto.'});
+  /* limites por categoria */
+  if(typeof limites==='function')for(const l of limites()){
+    const g=-txDoMes(ym).filter(t=>t.catId===l.catId&&t.valor<0).reduce((a,t)=>a+t.valor,0);
+    if(g>l.valor)out.unshift({t:'bad',ic:'🚦',h:catById(l.catId).nome+' passou do limite em '+brl(g-l.valor),p:'Gasto de '+brl(g)+' contra um limite de '+brl(l.valor)+' no mês.'});
+    else if(g>l.valor*.85)out.push({t:'warn',ic:'🚦',h:catById(l.catId).nome+' perto do limite',p:'Já foram '+brl(g)+' de '+brl(l.valor)+' ('+pct(g/l.valor,0)+').'});
+  }
   /* assinaturas recorrentes */
   const rec=recorrentes();
   if(rec.length) out.push({t:'neutral',ic:'🔁',h:rec.length+' cobranças recorrentes: '+brl(rec.reduce((a,r)=>a+r.valor,0))+'/mês',

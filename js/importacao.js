@@ -266,38 +266,55 @@ function revisarImportacao(){
   const cats=S.categorias.filter(x=>x.tipo!=='receita');
   sheet(`<h2>Revisar importação</h2>
   <div class="sh-sub" id="impResumo"></div>
-  <div class="card flat" style="padding:var(--s3) var(--s4);margin-bottom:var(--s3)"><h3 style="margin-bottom:var(--s1)">Gastos por categoria</h3><div id="impCats"></div></div>
+  <div class="empilhada" id="impBarra" style="margin-bottom:var(--s2)"></div>
+  <div class="legend" id="impLegenda" style="margin:0 0 var(--s3)"></div>
   <div id="impParc"></div>
-  <div class="row" style="margin-bottom:var(--s2)"><span class="sub">Desmarque o que não for gasto (ex.: pagamento, estorno).</span>
+  <div class="row" style="margin-bottom:var(--s2)"><span class="sub">Agrupado por categoria. Desmarque o que não for gasto.</span>
     <button class="btn ghost sm" id="impTodos">Desmarcar todos</button></div>
-  <div class="list" style="max-height:40vh;overflow-y:auto" id="impLista">
-    ${unicas.map((t,i)=>{const c=catById(t.catId);return `<div class="item">
-      <input type="checkbox" class="impchk" data-i="${i}" checked aria-label="Importar ${esc(t.desc)}" style="width:18px;height:18px;accent-color:var(--accent);flex:none">
-      <div class="ic" aria-hidden="true">${c.ic}</div>
-      <div class="mid"><div class="t">${esc(t.desc)}</div>
-        <div class="s">${dLabel(t.data)} · <select data-i="${i}" class="impcat" aria-label="Categoria de ${esc(t.desc)}" style="background:none;border:0;color:var(--accent);font-weight:650;font-size:11.5px;padding:0">${cats.map(x=>`<option value="${x.id}" ${x.id===t.catId?'selected':''}>${esc(x.nome)}</option>`).join('')}</select>
-        ${t.parcelaDe>1?` · <b style="color:var(--warn)">${t.parcelaN}/${t.parcelaDe}</b>`:''}</div></div>
-      <div class="val ${sinalCls(t.valor)}">${t.valor<0?'−':'+'}${brl(Math.abs(t.valor),{noPrefix:true})}</div></div>`}).join('')}
-  </div>
+  <div id="impLista" style="max-height:46vh;overflow-y:auto"></div>
   <button class="btn" id="impConfirma" style="margin-top:var(--s3)"></button>`);
   const escolhidas=()=>unicas.filter((t,i)=>marcado[i]);
+  const abertos=new Set();
+  let ordemCats=[];
+  function pintarLista(){
+    $$('#impLista details[open]').forEach(d=>abertos.add(d.dataset.cat));
+    const gs={};unicas.forEach((t,i)=>{(gs[t.catId]=gs[t.catId]||[]).push(i)});
+    const ordem=Object.entries(gs).map(([id,ix])=>({id,ix,tot:ix.reduce((a,i)=>a+Math.abs(unicas[i].valor),0)})).sort((a,b)=>b.tot-a.tot);
+    ordemCats=ordem.map(g=>g.id);
+    $('#impLista').innerHTML=ordem.map((g,gi)=>{const c=catById(g.id);return `<details class="grupo" data-cat="${g.id}" ${abertos.has(g.id)||ordem.length===1?'open':''}>
+      <summary><i style="width:10px;height:10px;border-radius:3px;background:${COR[gi%6]};flex:none"></i><span class="gnome">${c.ic} ${esc(c.nome)}</span>
+        <span class="gqtd" data-gq="${g.id}"></span><span class="gval" data-gv="${g.id}"></span></summary>
+      <div class="gcorpo">${g.ix.map(i=>{const t=unicas[i];return `<div class="item">
+        <input type="checkbox" class="impchk" data-i="${i}" ${marcado[i]?'checked':''} aria-label="Importar ${esc(t.desc)}" style="width:18px;height:18px;accent-color:var(--accent);flex:none">
+        <div class="mid"><div class="t">${esc(t.desc)}</div>
+          <div class="s">${dLabel(t.data)}${t.parcelaDe>1?` · <b style="color:var(--warn)">${t.parcelaN}/${t.parcelaDe}</b>`:''} · <select data-i="${i}" class="impcat" aria-label="Categoria de ${esc(t.desc)}" style="background:none;border:0;color:var(--accent);font-weight:650;font-size:11.5px;padding:0">${cats.map(x=>`<option value="${x.id}" ${x.id===t.catId?'selected':''}>${esc(x.nome)}</option>`).join('')}</select></div></div>
+        <div class="val ${sinalCls(t.valor)}">${t.valor<0?'−':'+'}${brl(Math.abs(t.valor),{noPrefix:true})}</div></div>`}).join('')}</div></details>`}).join('');
+    $$('#impLista .impchk').forEach(c=>c.onchange=e=>{marcado[+e.target.dataset.i]=e.target.checked;atualizar()});
+    $$('#impLista .impcat').forEach(sel=>sel.onchange=e=>{
+      const t=unicas[+e.target.dataset.i];t.catId=e.target.value;S.aprendizado[chaveEstab(t.desc)]=t.catId;abertos.add(t.catId);pintarLista();atualizar();
+    });
+  }
   function atualizar(){
     const sel=escolhidas(), tot=sel.reduce((a,t)=>a+Math.abs(t.valor),0), parc=sel.filter(t=>t.parcelaDe>1).length;
     $('#impResumo').textContent=`${sel.length} de ${unicas.length} lançamentos · ${brl(tot)} · fatura de ${ymLabel(competencia)}${dup?` · ${dup} duplicados ignorados`:''}`;
     const m={};sel.filter(t=>t.valor<0).forEach(t=>{m[t.catId]=(m[t.catId]||0)-t.valor});
-    const lista=Object.entries(m).map(([id,v])=>({n:catById(id).ic+'  '+catById(id).nome,v})).sort((a,b)=>b.v-a.v);
-    const totG=lista.reduce((a,x)=>a+x.v,0);
-    $('#impCats').innerHTML=lista.length?barrasH(lista.slice(0,6),{tot:totG}):'<div class="sub">Nenhum gasto marcado.</div>';
+    const lista=Object.entries(m).map(([id,v])=>({id,c:catById(id),v})).sort((a,b)=>b.v-a.v);
+    const totG=lista.reduce((a,x)=>a+x.v,0)||1;
+    const corDe=id=>COR[Math.max(0,ordemCats.indexOf(id))%6];
+    $('#impBarra').innerHTML=lista.map(x=>`<i style="width:${(x.v/totG*100).toFixed(1)}%;background:${corDe(x.id)}" title="${esc(x.c.nome)}"></i>`).join('');
+    $('#impLegenda').innerHTML=lista.slice(0,4).map(x=>`<div><i style="background:${corDe(x.id)}"></i>${esc(x.c.nome)} <b class="num" style="color:var(--ink)">${pct(x.v/totG,0)}</b></div>`).join('');
+    for(const id of ordemCats){
+      const itens=unicas.map((t,i)=>({t,i})).filter(x=>x.t.catId===id), on=itens.filter(x=>marcado[x.i]);
+      const q=$(`#impLista [data-gq="${id}"]`), v=$(`#impLista [data-gv="${id}"]`);
+      if(q)q.textContent=on.length+' de '+itens.length;
+      if(v)v.textContent=brl(on.reduce((a,x)=>a+Math.abs(x.t.valor),0));
+    }
     $('#impParc').innerHTML=parc?`<div class="warnbox" style="margin-bottom:var(--s3)">${parc} compra${parc>1?'s':''} parcelada${parc>1?'s':''} — as parcelas futuras serão lançadas sozinhas nos meses seguintes.</div>`:'';
     const b=$('#impConfirma');b.textContent=`Confirmar ${sel.length} lançamento${sel.length===1?'':'s'}`;b.disabled=!sel.length;
     $('#impTodos').textContent=sel.length?'Desmarcar todos':'Marcar todos';
   }
-  atualizar();
-  $$('.impchk').forEach(c=>c.onchange=e=>{marcado[+e.target.dataset.i]=e.target.checked;atualizar()});
+  pintarLista();atualizar();
   $('#impTodos').onclick=()=>{const v=!escolhidas().length;marcado.fill(v);$$('.impchk').forEach(c=>c.checked=v);atualizar()};
-  $$('.impcat').forEach(s=>s.onchange=e=>{
-    const t=unicas[+e.target.dataset.i];t.catId=e.target.value;S.aprendizado[chaveEstab(t.desc)]=t.catId;atualizar();
-  });
   $('#impConfirma').onclick=()=>{
     const sel=escolhidas();if(!sel.length)return;
     S.transacoes.push(...sel);

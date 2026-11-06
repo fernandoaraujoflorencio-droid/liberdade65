@@ -137,6 +137,7 @@ const DEFAULT={
   saldoContas:0,
   reservaAtual:0,
   ultimoBackupEm:null, /* novo: data do último backup exportado */
+  movimentos:[],        /* novo: compras, vendas, aplicações e resgates */
   ui:{tab:'painel',ym:ymNow(),tema:''}
 };
 let S=carregar();

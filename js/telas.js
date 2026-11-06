@@ -3,103 +3,120 @@
    ===================================================================== */
 const TITULOS={painel:'Painel',lancar:'Lançamentos',faturas:'Faturas',investir:'Investir',liberdade:'Liberdade',config:'Configurações'};
 
+/* limites de gasto por categoria — guardados em S.metas (campo que já existia vazio):
+   {id, tipo:'limite', catId, valor(centavos por mês)} */
+const limites=()=>(S.metas||[]).filter(m=>m&&m.tipo==='limite'&&m.valor>0);
+const limiteDe=catId=>limites().find(m=>m.catId===catId)?.valor||0;
+
 function renderPainel(){
   const ym=S.ui.ym, o=orcamento(ym), F=fire(), el=$('#v-painel');
-  const cats=gastoPorCategoria(ym).slice(0,6);
-  const totCat=cats.reduce((a,c)=>a+c.valor,0);
-  const ins=insights(ym);
   const semRenda=o.renda<=0;
   const corDisp=o.disponivel<0?'var(--bad)':(o.disponivel<o.tetoGasto*.15?'var(--warn)':'var(--good)');
   const valorHero=o.ehMesAtual?Math.max(0,o.porDia):Math.max(0,o.disponivel);
   const [ints,dec]=brl(valorHero,{noPrefix:true}).split(',');
-  const avisoBk=avisoBackupHTML();
+  const meta=S.perfil.metaPoupanca, ok=o.taxa>=meta;
+  const parcelas=-txDoMes(ym).filter(t=>t.valor<0&&t.parcelaDe>1).reduce((a,t)=>a+t.valor,0);
+  const ins=insights(ym);
+  const cats=gastoPorCategoria(ym);
+  const totCat=cats.reduce((a,c)=>a+c.valor,0);
+  const A=typeof resumoAportes==='function'?resumoAportes(ym):{liquido:0,n:0};
+  const sm=serieMeses(ym,6), temHist=sm.some(m=>m.vals.some(v=>v>0));
 
   el.innerHTML=`
-  ${avisoBk}
+  ${avisoBackupHTML()}
   ${semRenda?`<button class="card span2" id="cta-renda" style="text-align:left;width:100%;border-color:var(--accent);background:var(--accent-soft);cursor:pointer">
     <h3 style="color:var(--accent)">Comece por aqui <span class="tag">passo 1</span></h3>
     <div style="font-size:var(--t-base);font-weight:650;margin-bottom:4px">Quanto cai na sua conta por mês?</div>
-    <div class="sub">Informe a renda líquida para eu calcular quanto você pode gastar guardando ${pct(S.perfil.metaPoupanca,0)}. Depois, importe a fatura do cartão na aba Faturas.</div>
+    <div class="sub">Informe a renda líquida para eu calcular quanto você pode gastar guardando ${pct(meta,0)}.</div>
   </button>`:''}
 
   <div class="hero span2">
     <div class="lab">${o.ehMesAtual?'Você pode gastar hoje':'Sobrou no mês'}</div>
     <div class="big"><span class="cur">R$</span>${ints}<span class="cents">,${dec}</span></div>
     <div class="note">${semRenda?'Informe sua renda para eu calcular este número.'
-      :o.ehMesAtual?`${brl(o.disponivel)} disponíveis ÷ ${o.diasRestantes} dia${o.diasRestantes>1?'s':''} até o fim do mês, já reservando ${brl(o.metaValor)} para investir.`
-      :`Teto do mês era ${brl(o.tetoGasto)} e você gastou ${brl(o.gasto)}.`}</div>
-    <div class="strip">
-      <div><div class="k">Guardar</div><div class="v pos">${brl(o.metaValor)}</div></div>
-      <div><div class="k">Gasto</div><div class="v">${brl(o.gasto)}</div></div>
-      <div><div class="k">Teto</div><div class="v" style="color:${corDisp}">${brl(o.tetoGasto)}</div></div>
+      :o.ehMesAtual?`${brl(Math.max(0,o.disponivel))} livres até o fim do mês (${o.diasRestantes} dia${o.diasRestantes>1?'s':''}), já separando ${brl(o.metaValor)} para investir.`
+      :`O teto do mês era ${brl(o.tetoGasto)}.`}</div>
+    <div class="kpis">
+      <div><div class="k">Entrou</div><div class="v pos">${brl(o.renda)}</div></div>
+      <div><div class="k">Gastou</div><div class="v ${o.gasto>o.tetoGasto&&o.tetoGasto>0?'neg':''}">${brl(o.gasto)}</div><div class="d">teto ${brl(o.tetoGasto)}</div></div>
+      <div><div class="k">Investiu</div><div class="v">${brl(o.aporte||Math.max(0,A.liquido))}</div><div class="d">${A.n?A.n+' movimentaç'+(A.n>1?'ões':'ão'):'aportes do mês'}</div></div>
+      <div><div class="k">Guardou</div><div class="v ${ok?'pos':'neg'}">${pct(o.taxa,0)}</div><div class="d">meta ${pct(meta,0)} ${ok?'✓':''}</div></div>
     </div>
   </div>
 
   <div class="card">
-    <h3>Regra dos ${pct(S.perfil.metaPoupanca,0)} <span class="tag ${o.taxa>=S.perfil.metaPoupanca?'pill ok':'pill warn'}">${o.taxa>=S.perfil.metaPoupanca?'no alvo':'abaixo'}</span></h3>
-    <div class="donutrow">
-      <div>${gauge(o.taxa,S.perfil.metaPoupanca)}</div>
-      <div style="flex:1;min-width:0">
-        <div class="sub" style="margin-bottom:9px">De cada R$ 100 que entram, você guardou <b style="color:var(--ink)">R$ ${(o.taxa*100).toFixed(0)}</b>.</div>
-        <div class="track" role="img" aria-label="Consumo do teto de gastos: ${brl(o.gasto)} de ${brl(o.tetoGasto)}">
-          <i style="width:${clamp(o.gasto/Math.max(1,o.tetoGasto),0,1)*100}%;background:${corDisp};opacity:.9"></i>
-          ${o.ehMesAtual?`<b style="left:${clamp(o.diaHoje/o.dias,0,1)*100}%"></b>`:''}
-        </div>
-        <div class="row" style="margin-top:6px;font-size:var(--t-xs)">
-          <span class="muted num">${brl(o.gasto)} de ${brl(o.tetoGasto)}</span>
-          <span class="muted">${o.ehMesAtual?'ritmo ideal hoje: '+brl(o.ritmoIdeal):''}</span>
-        </div>
-      </div>
+    <h3>Orçamento de ${ymShort(ym)} <span class="tag ${ok?'pill ok':'pill warn'}">${ok?'no alvo':'atenção'}</span></h3>
+    <div class="track" role="img" aria-label="Gasto de ${brl(o.gasto)} de um teto de ${brl(o.tetoGasto)}">
+      <i style="width:${clamp(o.gasto/Math.max(1,o.tetoGasto),0,1)*100}%;background:${corDisp};opacity:.9"></i>
+      ${o.ehMesAtual?`<b style="left:${clamp(o.diaHoje/o.dias,0,1)*100}%" title="hoje"></b>`:''}
     </div>
-    <div class="hair"></div>
-    <div class="grid3">
-      <div class="stat"><div class="k">Essencial</div><div class="v">${brlK(despesasPorTipo(ym,'essencial'))}</div><div class="d">contas que não param</div></div>
-      <div class="stat"><div class="k">Variável</div><div class="v">${brlK(despesasPorTipo(ym,'variavel'))}</div><div class="d">onde o corte cabe</div></div>
-      <div class="stat"><div class="k">Investido</div><div class="v pos">${brlK(o.aporte)}</div><div class="d">aportes do mês</div></div>
+    <div class="row" style="margin:6px 0 var(--s3);font-size:var(--t-xs)">
+      <span class="muted num">${pct(o.tetoGasto>0?o.gasto/o.tetoGasto:0,0)} do teto usado</span>
+      <span class="muted">${o.ehMesAtual?'o traço marca hoje':''}</span>
+    </div>
+    <div class="linhas">
+      <div class="row"><span>Essenciais</span><span class="num">${brl(despesasPorTipo(ym,'essencial'))}</span></div>
+      <div class="row"><span>Variáveis</span><span class="num">${brl(despesasPorTipo(ym,'variavel'))}</span></div>
+      ${parcelas?`<div class="row"><span>· das quais parcelas de cartão</span><span class="num" style="color:var(--warn)">${brl(parcelas)}</span></div>`:''}
+      <div class="row"><span><b>Sobra do mês</b></span><span class="num ${sinalCls(o.guardado)}"><b>${brlS(o.guardado)}</b></span></div>
     </div>
   </div>
 
-  ${(()=>{const sm=serieMeses(ym,6);const tem=sm.some(m=>m.vals.some(v=>v>0));
-    return `<div class="card"><h3>Últimos 6 meses <span class="tag muted">até ${ymShort(ym)}</span></h3>
-    ${tem?barrasGrupo(sm,[{n:'Entradas',cor:'var(--good)'},{n:'Gastos',cor:'var(--bad)'},{n:'Aportes',cor:'var(--c3)'}],{alt:'Entradas, gastos e aportes nos últimos 6 meses'})
+  <div class="card"><h3>Últimos 6 meses</h3>
+    ${temHist?barrasGrupo(sm,[{n:'Entradas',cor:'var(--good)'},{n:'Gastos',cor:'var(--bad)'},{n:'Aportes',cor:'var(--c3)'}],{alt:'Entradas, gastos e aportes nos últimos 6 meses'})
       +(()=>{const g=sm.map(m=>m.vals[1]).filter(v=>v>0);const med=g.length?Math.round(g.reduce((a,b)=>a+b,0)/g.length):0;
-        return med?`<div class="sub" style="margin-top:var(--s2)">Gasto médio: <b class="num" style="color:var(--ink)">${brl(med)}</b>/mês · este mês ${o.gasto>med?'<span class="neg">acima</span>':'<span class="pos">abaixo</span>'} da média</div>`:''})()
-      :'<div class="sub">O gráfico aparece quando houver lançamentos nos meses anteriores.</div>'}</div>`})()}
+        return med?`<div class="sub" style="margin-top:var(--s2)">Gasto médio <b class="num" style="color:var(--ink)">${brl(med)}</b>/mês · este mês ${o.gasto>med?'<span class="neg">acima</span>':'<span class="pos">abaixo</span>'} da média</div>`:''})()
+      :vazio({ic:'investir',t:'Sem histórico ainda',p:'O gráfico aparece quando houver lançamentos nos meses anteriores.'})}
+  </div>
 
-  ${ins.length?`<div class="card"><h3>O que eu olharia primeiro</h3><div class="list">
-    ${ins.map(i=>`<div class="item" style="align-items:flex-start">
-      <div class="ic" aria-hidden="true" style="background:var(--${i.t==='ok'?'good':i.t==='bad'?'bad':i.t==='warn'?'warn':'sunken'}-soft, var(--sunken))">${i.ic}</div>
-      <div class="mid"><div class="t" style="white-space:normal">${esc(i.h)}</div><div class="s" style="white-space:normal;color:var(--ink-2);margin-top:2px">${esc(i.p)}</div></div>
-    </div>`).join('')}</div></div>`:''}
+  <div class="card"><h3>Gastos por categoria <button class="btn ghost sm" id="btnLimites" style="text-transform:none;letter-spacing:0">Limites</button></h3>
+    ${cats.length?`<div class="empilhada" role="img" aria-label="Divisão dos gastos">${cats.slice(0,6).map((c,i)=>`<i style="width:${(c.valor/totCat*100).toFixed(1)}%;background:${COR[i%6]}" title="${esc(c.cat.nome)}"></i>`).join('')}</div>
+      <div style="margin-top:var(--s3)">${cats.slice(0,6).map((c,i)=>{const lim=limiteDe(c.cat.id), base=Math.max(lim,c.valor), passou=lim&&c.valor>lim;
+        return `<div class="catbar"><div class="row"><span>${c.cat.ic} ${esc(c.cat.nome)}</span>
+          <span class="num"><b>${brl(c.valor)}</b> ${lim?`<span class="${passou?'neg':'muted'}" style="font-size:var(--t-xs)">/ ${brl(lim,{dec:0})}</span>`:`<span class="muted" style="font-size:var(--t-xs)">${pct(c.valor/totCat,0)}</span>`}</span></div>
+          <div class="trk"><i style="width:${(c.valor/base*100).toFixed(1)}%;background:${passou?'var(--bad)':COR[i%6]}"></i>${lim?`<b style="left:${Math.min(100,lim/base*100).toFixed(1)}%"></b>`:''}</div></div>`}).join('')}</div>
+      ${cats.length>6?`<button class="btn ghost sm block" data-goto="lancar" style="margin-top:var(--s2)">Ver todas as ${cats.length} categorias</button>`:''}`
+    :vazio({ic:'lista',t:'Nenhum gasto em '+ymLabel(ym),p:'Lance um gasto pelo <b>+</b> ou importe a fatura do cartão.',acao:'Importar fatura',attrs:'data-goto="faturas"'})}
+  </div>
 
-  ${cats.length?`<div class="card"><h3>Para onde foi o dinheiro <span class="tag muted">${ymShort(ym)}</span></h3>
-    <div class="donutrow" style="margin-bottom:4px">
-      ${donut(cats.map(c=>({n:c.cat.nome,v:c.valor})),{lab:'GASTO',centro:brlK(totCat),alt:'Gastos por categoria'})}
-      <div style="flex:1;min-width:0" class="legend col">
-        ${cats.map((c,i)=>`<div><i style="background:${COR[i%6]}"></i><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.cat.nome)}</span><b class="num" style="color:var(--ink)">${pct(c.valor/totCat,0)}</b></div>`).join('')}
-      </div>
-    </div>
-    <div class="hair"></div>
-    ${barrasH(cats.map(c=>({n:c.cat.ic+'  '+c.cat.nome,v:c.valor})),{tot:totCat})}
-  </div>`:`<div class="card">${vazio({ic:'lista',t:'Nenhum gasto em '+ymLabel(ym),
-      p:'Lance um gasto pelo botão <b>+</b> ou importe a fatura do cartão para ver para onde vai o dinheiro.',acao:'Importar fatura',attrs:'data-goto="faturas"'})}</div>`}
+  <div class="card"><h3>Atenção</h3>
+    ${ins.length?`<div class="list">${ins.slice(0,3).map(itemInsight).join('')}</div>
+      ${ins.length>3?`<details class="acc" style="margin-top:var(--s2)"><summary>Mais ${ins.length-3} ponto${ins.length-3>1?'s':''}</summary><div class="body" style="padding:0 var(--s3)"><div class="list">${ins.slice(3).map(itemInsight).join('')}</div></div></details>`:''}`
+      :vazio({ic:'check',t:'Tudo em ordem',p:'Nada que precise da sua atenção neste mês.'})}
+  </div>
 
   <div class="card span2">
-    <h3>Rumo à liberdade</h3>
-    <div class="row" style="align-items:flex-end;margin-bottom:9px">
-      <div class="stat" style="border:0;background:none;padding:0">
-        <div class="k">Patrimônio investido</div><div class="v" style="font-size:var(--t-xl)">${brl(F.pv)}</div></div>
-      <div style="text-align:right"><div class="stat" style="border:0;background:none;padding:0"><div class="k">Número da liberdade</div>
-        <div class="v" style="font-size:var(--t-base)">${brlK(F.numero)}</div></div></div>
+    <h3>Patrimônio e liberdade <button class="btn ghost sm" data-goto="liberdade" style="text-transform:none;letter-spacing:0">Ver plano</button></h3>
+    <div class="grid3">
+      <div class="stat"><div class="k">Patrimônio investido</div><div class="v">${brl(F.pv)}</div></div>
+      <div class="stat"><div class="k">Aporte líquido do mês</div><div class="v ${sinalCls(A.liquido)}">${A.n?brlS(A.liquido):brl(o.aporte)}</div><div class="d">${A.n?'compras − vendas':'pelos lançamentos'}</div></div>
+      <div class="stat"><div class="k">Número da liberdade</div><div class="v">${brlK(F.numero)}</div><div class="d">${F.numero>0&&isFinite(F.meses)?'faltam '+mesesTexto(F.meses):'defina renda e aporte'}</div></div>
     </div>
-    <div class="bar" style="height:12px" role="progressbar" aria-label="Progresso até o número da liberdade" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${(F.progresso*100).toFixed(0)}"><i style="width:${(F.progresso*100).toFixed(2)}%;background:var(--accent)"></i></div>
-    <div class="row" style="margin-top:7px">
-      <span class="sub">${pct(F.progresso,1)} do caminho</span>
-      <span class="sub">${F.numero>0&&isFinite(F.meses)?'faltam '+mesesTexto(F.meses):'defina renda e aporte'}</span>
-    </div>
-    <button class="btn ghost sm block" style="margin-top:var(--s3)" data-goto="liberdade">Ver o plano completo</button>
+    <div class="bar" style="height:10px;margin-top:var(--s3)" role="progressbar" aria-label="Progresso até o número da liberdade" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${(F.progresso*100).toFixed(0)}"><i style="width:${(F.progresso*100).toFixed(2)}%;background:var(--accent)"></i></div>
+    <div class="sub" style="margin-top:6px">${pct(F.progresso,1)} do caminho até a liberdade financeira</div>
   </div>`;
   el.querySelector('#cta-renda')?.addEventListener('click',()=>abrirConfigRenda());
+  $('#btnLimites')?.addEventListener('click',()=>abrirLimites());
+}
+function itemInsight(i){
+  return `<div class="item" style="align-items:flex-start">
+    <div class="ic" aria-hidden="true" style="background:var(--${i.t==='ok'?'good':i.t==='bad'?'bad':i.t==='warn'?'warn':'sunken'}-soft, var(--sunken))">${i.ic}</div>
+    <div class="mid"><div class="t" style="white-space:normal">${esc(i.h)}</div><div class="s" style="white-space:normal;color:var(--ink-2);margin-top:2px">${esc(i.p)}</div></div>
+  </div>`;
+}
+function abrirLimites(){
+  const cats=S.categorias.filter(c=>c.tipo==='essencial'||c.tipo==='variavel');
+  const med=id=>{const meses=[1,2,3].map(n=>addMonthYM(S.ui.ym,-n));const v=meses.map(m=>-txDoMes(m).filter(t=>t.catId===id&&t.valor<0).reduce((a,t)=>a+t.valor,0));return Math.round(v.reduce((a,b)=>a+b,0)/3)};
+  sheet(`<h2>Limites por categoria</h2><div class="sh-sub">Quanto você quer gastar no máximo, por mês, em cada categoria. Deixe vazio para não ter limite. O Painel avisa quando passar.</div>
+  <div class="grid2">${cats.map(c=>{const m=med(c.id);return `<div class="fgroup"><label class="f" for="lim-${c.id}">${c.ic} ${esc(c.nome)}</label>
+    <input class="inp lim" id="lim-${c.id}" data-cat="${c.id}" inputmode="decimal" value="${campoMoney(limiteDe(c.id))}" placeholder="sem limite" ${m?`aria-describedby="limh-${c.id}"`:''}>
+    ${m?`<div class="hint" id="limh-${c.id}">média dos últimos 3 meses: ${brl(m)}</div>`:''}</div>`}).join('')}</div>
+  <button class="btn" id="limSalvar">Salvar limites</button>`);
+  $('#limSalvar').onclick=()=>{
+    const outros=(S.metas||[]).filter(m=>!(m&&m.tipo==='limite'));
+    const novos=$$('.lim').map(i=>({id:'lim-'+i.dataset.cat,tipo:'limite',catId:i.dataset.cat,valor:parseMoney(i.value)})).filter(m=>m.valor>0);
+    S.metas=[...outros,...novos];salvar();fecharSheet();render();toast(novos.length?novos.length+' limite'+(novos.length>1?'s':'')+' salvo'+(novos.length>1?'s':''):'Limites removidos');
+  };
 }
 
 let filtroLanc={q:'',tipo:'todos'};
@@ -194,6 +211,8 @@ function renderFaturas(){
       p:'Cadastre o seu cartão (nome, limite, dia de fechamento e de vencimento) para importar faturas e acompanhar as parcelas futuras.',acao:'Cadastrar cartão',attrs:'data-novo-cartao'})}</div>`}
   ${temCartao?`<button class="addtile" data-novo-cartao><span class="vic" aria-hidden="true">${svgIc('cartao',22)}</span><span>+ Novo cartão</span></button>`:''}
 
+  ${cardFaturaCategorias(ym)}
+
   <div class="card">
     <h3>Compromissos já assumidos <span class="tag num">${brl(totalFut)}</span></h3>
     <div class="sub" style="margin-bottom:var(--s3)">Parcelas que vão cair sozinhas nas próximas faturas. Esse dinheiro já saiu da sua liberdade — ele só ainda não saiu da conta.</div>
@@ -243,8 +262,14 @@ function renderInvestir(){
   const reb=rebalancear(F.aporteMes);
   const dados=Object.entries(cls).filter(([,v])=>v>0).map(([n,v])=>({n,v}));
 
+  const parecidos=ativosParecidos();
   el.innerHTML=`
+  ${parecidos.length?`<div class="warnbox aviso span2" id="avisoParecidos"><div class="aic" aria-hidden="true">🧩</div><div class="acorpo">
+    <b>${parecidos.length===1?'Encontrei 2 ativos que parecem o mesmo':'Encontrei '+parecidos.length+' pares de ativos que parecem o mesmo'}</b>
+    (${parecidos.slice(0,3).map(([a,b])=>esc(a.ticker||a.nome)+' e '+esc(b.ticker||b.nome)).join('; ')}). Unir soma as quantidades e refaz o preço médio.
+    <div><button class="btn sm" id="btnParecidos">Revisar e unir</button></div></div></div>`:''}
   ${cardAtivos()}
+  ${cardAportes(S.ui.ym)}
 
   <div class="pilha">${cardEvolucao()}${cardProventos(F,P)}</div>
 
@@ -266,7 +291,7 @@ function renderInvestir(){
   </div>
 
   <div class="card">
-    <h3>Aporte do mês <span class="tag muted">${pct(S.perfil.metaPoupanca,0)} da renda</span></h3>
+    <h3>Onde aportar <span class="tag muted">rebalanceamento · ${pct(S.perfil.metaPoupanca,0)} da renda</span></h3>
     <div class="sub" style="margin-bottom:var(--s3)">Rebalanceamento por aporte: em vez de vender para acertar a carteira (o que gera IR e custo), o app manda o dinheiro novo para a classe mais atrasada. É o método que planejadores usam com quem ainda está acumulando.</div>
     <div class="tblwrap"><table>
       <caption class="sr-only">Sugestão de aporte por classe</caption>
@@ -319,6 +344,9 @@ function renderInvestir(){
   </div>`;
 
   $$('[data-add-ativo]',el).forEach(b=>b.onclick=()=>abrirAtivo());
+  $('#btnParecidos')?.addEventListener('click',()=>abrirParecidos());
+  $('#btnMovTodos')?.addEventListener('click',()=>abrirMovimentos());
+  $('#btnMovNovo')?.addEventListener('click',()=>abrirMovimento());
   $('#editAloc').onclick=()=>abrirAlocacao();
   ligarCardAtivos(el);
   $$('.sim',el).forEach(i=>i.addEventListener('input',simular));
@@ -516,6 +544,12 @@ function renderConfig(){
       <input class="inp" id="cfgToken" type="password" autocomplete="off" value="${esc(getToken())}" placeholder="cole aqui o seu token" aria-describedby="cfgTokenH"></div>
     <div class="sub" id="cfgTokenH">As cotações vêm da brapi.dev, plano gratuito. PETR4, VALE3, ITUB4 e MGLU3 funcionam sem token; para os demais, crie uma conta grátis em brapi.dev, copie o token e cole acima. O token fica salvo só neste navegador e não entra no backup. O app atualiza sozinho ao abrir (se a última busca tiver mais de 1 hora) e pelo botão ↻ na aba Investir.</div>
   </div>
+  <div class="card">
+    <h3>Aparência</h3>
+    <div class="fgroup"><label class="f" for="cfgTema">Tema</label>
+      <select class="inp" id="cfgTema">${[['','Automático (segue o aparelho)'],['light','Claro'],['dark','Escuro'],['amoled','AMOLED — preto puro']].map(([v,n])=>`<option value="${v}" ${(S.ui.tema||'')===v?'selected':''}>${n}</option>`).join('')}</select></div>
+    <div class="sub">O AMOLED usa preto absoluto: fica mais confortável à noite e economiza bateria em telas OLED.</div>
+  </div>
   <div class="card" id="cardDados">
     <h3>Seus dados</h3>
     <div class="grid2">
@@ -545,6 +579,7 @@ function renderConfig(){
     toast(e.target.value.trim()?'Token salvo — buscando cotações':'Token removido');
     if(e.target.value.trim()){S.cotacoesEm=null;atualizarCotacoes({silencioso:false})}
   });
+  $('#cfgTema').onchange=e=>{S.ui.tema=e.target.value;salvar();aplicarTema(S.ui.tema);toast('Tema '+TEMA_ROTULO[S.ui.tema])};
   ligarBackup(el);
 }
 function abrirConfigRenda(){irPara('config');setTimeout(()=>$('#cfg-perfil-rendaLiquida')?.focus(),80)}
@@ -567,5 +602,44 @@ function cardProventos(F,P){
       <div class="stat"><div class="k">Regra dos ${pct(P.swr,0)}</div><div class="v">${brl(F.rendaPassiva)}</div><div class="d">por mês, sem tocar no principal</div></div>
     </div>
     ${itens.length?`<div class="hair"></div><div class="sub" style="margin-bottom:var(--s2)">Quem paga mais por ano</div>${barrasH(itens.slice(0,6),{tot:ano})}`:''}
+  </div>`;
+}
+
+/* ---------- fatura do mês agrupada por categoria ---------- */
+function gruposPorCategoria(txs){
+  const m={};
+  for(const t of txs){(m[t.catId]=m[t.catId]||{cat:catById(t.catId),itens:[],total:0});m[t.catId].itens.push(t);m[t.catId].total+=-t.valor}
+  return Object.values(m).sort((a,b)=>b.total-a.total).map(g=>({...g,itens:g.itens.sort((a,b)=>a.valor-b.valor)}));
+}
+function cardFaturaCategorias(ym){
+  const txs=S.transacoes.filter(t=>t.cartaoId&&t.competencia===ym&&t.valor<0);
+  if(!txs.length)return '';
+  const gs=gruposPorCategoria(txs), tot=gs.reduce((a,g)=>a+g.total,0);
+  return `<div class="card span2"><h3>Cartão em ${ymShort(ym)} por categoria <span class="tag num">${brl(tot)}</span></h3>
+    <div class="empilhada" style="margin-bottom:var(--s3)" role="img" aria-label="Divisão da fatura por categoria">${gs.slice(0,6).map((g,i)=>`<i style="width:${(g.total/tot*100).toFixed(1)}%;background:${COR[i%6]}" title="${esc(g.cat.nome)}"></i>`).join('')}</div>
+    ${gs.map((g,i)=>`<details class="grupo"><summary><i style="width:10px;height:10px;border-radius:3px;background:${COR[i%6]};flex:none"></i>
+      <span class="gnome">${g.cat.ic} ${esc(g.cat.nome)}</span><span class="gqtd">${g.itens.length} · ${pct(g.total/tot,0)}</span><span class="gval">${brl(g.total)}</span></summary>
+      <div class="gcorpo"><div class="list">${g.itens.map(itemTx).join('')}</div></div></details>`).join('')}
+  </div>`;
+}
+
+/* ---------- aportes do mês (movimentações de investimento) ---------- */
+function cardAportes(ym){
+  const A=resumoAportes(ym);
+  const serie=[];for(let i=5;i>=0;i--){const m=addMonthYM(ym,-i),r=resumoAportes(m);serie.push({l:MES3[+m.slice(5)-1],vals:[r.entradas,r.saidas]})}
+  const temSerie=serie.some(x=>x.vals.some(v=>v>0));
+  const recentes=[...A.ms].sort((a,b)=>b.data.localeCompare(a.data)).slice(0,5);
+  return `<div class="card span2" id="cardAportes"><h3>Aportes de ${ymShort(ym)}
+      <span class="btnrow" style="text-transform:none;letter-spacing:0"><button class="btn sm" id="btnMovNovo">+ Lançar</button><button class="btn ghost sm" id="btnMovTodos">Histórico</button></span></h3>
+    <div class="grid4">
+      <div class="stat"><div class="k">Compras e aplicações</div><div class="v pos">${brl(A.entradas)}</div></div>
+      <div class="stat"><div class="k">Vendas e resgates</div><div class="v ${A.saidas?'neg':''}">${brl(A.saidas)}</div></div>
+      <div class="stat"><div class="k">Aporte líquido</div><div class="v ${sinalCls(A.liquido)}">${brlS(A.liquido)}</div><div class="d">o que ficou investido</div></div>
+      <div class="stat"><div class="k">Resultado das vendas</div><div class="v ${sinalCls(A.resultado)}">${A.resultado?brlS(A.resultado):'—'}</div><div class="d">venda − preço médio</div></div>
+    </div>
+    ${temSerie||recentes.length?`<div class="aportes-dois">
+      <div>${temSerie?barrasGrupo(serie,[{n:'Entradas',cor:'var(--good)'},{n:'Saídas',cor:'var(--bad)'}],{alt:'Aportes e resgates nos últimos 6 meses'}):''}</div>
+      <div>${recentes.length?`<div class="list">${recentes.map(itemMov).join('')}</div>`:'<div class="sub">Nenhuma movimentação neste mês.</div>'}</div>
+    </div>`:`<div class="sub" style="margin-top:var(--s3)">Use <b>+ Lançar</b> (ou o botão <b>+</b> desta aba) para registrar compras e vendas. Mudar a quantidade de um ativo também vira registro.</div>`}
   </div>`;
 }

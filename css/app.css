@@ -67,6 +67,22 @@
   color-scheme:dark;
 }
 
+/* AMOLED: preto puro (economiza bateria em telas OLED) */
+:root[data-theme="amoled"]{
+  --ground:#000000; --surface:#0A0A0A; --raised:#121212; --sunken:#060606;
+  --line:#1C1C1C; --line-strong:#2C2C2C;
+  --ink:#F2F2F2; --ink-2:#B8B8B8; --ink-3:#949494;
+  --accent:#F0B54E; --accent-hover:#F6C873; --accent-soft:#231A08; --on-accent:#000000;
+  --good:#3FD0B9; --good-soft:#0A2420;
+  --bad:#FF8A73; --bad-soft:#2A120D; --on-bad:#000000;
+  --warn:#F2B656; --warn-soft:#231A07;
+  --c1:#2FB3A1; --c2:#D9A443; --c3:#5C95E6; --c4:#E87A63; --c5:#A98AE0; --c6:#86AE62;
+  --grid:#161616;
+  --scrim:rgba(0,0,0,.75);
+  --shadow-sm:none; --shadow:none; --shadow-lg:0 0 0 1px #2C2C2C;
+  color-scheme:dark;
+}
+
 /* ============ BASE ============ */
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
@@ -429,7 +445,73 @@ details.acc .body{padding:0 14px 14px;font-size:13px;color:var(--ink-2);line-hei
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
 }
+.aportes-dois{display:grid;grid-template-columns:1fr;gap:var(--s4);margin-top:var(--s4)}
+@media (min-width:960px){.aportes-dois{grid-template-columns:1fr 1fr}}
+/* lista de movimentações com botão */
+.movrow{display:flex;align-items:center;gap:var(--s2);border-bottom:1px solid var(--line)}
+.movrow .item{flex:1;border-bottom:0}
+.movrow:last-child{border-bottom:0}
+/* grupos dobráveis (fatura por categoria) */
+.grupo{border:1px solid var(--line);border-radius:var(--r-sm);background:var(--raised);margin-bottom:var(--s2);overflow:hidden}
+.grupo>summary{display:flex;align-items:center;gap:var(--s2);padding:10px 12px;cursor:pointer;list-style:none;font-size:var(--t-md)}
+.grupo>summary::-webkit-details-marker{display:none}
+.grupo>summary .gnome{flex:1;min-width:0;font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.grupo>summary .gqtd{font-size:var(--t-xs);color:var(--ink-3)}
+.grupo>summary .gval{font-family:var(--f-num);font-weight:600;white-space:nowrap}
+.grupo>summary::after{content:"›";color:var(--ink-3);font-size:18px;transition:transform var(--dur);margin-left:2px}
+.grupo[open]>summary::after{transform:rotate(90deg)}
+.grupo>summary:hover{background:var(--sunken)}
+.grupo .gcorpo{padding:0 12px 6px;background:var(--surface)}
+.grupo .gcorpo .item{padding:8px 0}
+.empilhada{display:flex;height:12px;border-radius:var(--r-pill);overflow:hidden;background:var(--sunken);gap:2px}
+.empilhada i{display:block;height:100%}
+/* KPIs do painel */
+.kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--s3) var(--s4);margin-top:var(--s4);padding-top:var(--s3);border-top:1px solid var(--line)}
+.kpis .k{font-size:var(--t-2xs);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);font-weight:750}
+.kpis .v{font-family:var(--f-num);font-variant-numeric:tabular-nums;font-size:var(--t-base);font-weight:600;margin-top:2px;letter-spacing:-.02em}
+.kpis .d{font-size:var(--t-xs);color:var(--ink-3)}
+@media (min-width:600px){.kpis{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.linhas .row{padding:6px 0;border-bottom:1px solid var(--line);font-size:var(--t-sm)}
+.linhas .row:last-child{border-bottom:0}
+.linhas .row .num{font-weight:600}
+/* barra de categoria com limite */
+.catbar{padding:6px 0}
+.catbar .row{font-size:var(--t-sm);margin-bottom:4px}
+.catbar .trk{position:relative;height:8px;background:var(--sunken);border-radius:var(--r-pill)}
+.catbar .trk i{position:absolute;left:0;top:0;bottom:0;border-radius:var(--r-pill)}
+.catbar .trk b{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--ink);border-radius:2px}
+
+/* relatório da carteira (só aparece na impressão / PDF) */
+#relatorioPdf{display:none}
 @media print{
-  nav.tabs,.fab,header.top .toprow,.monthbar button{display:none!important}
-  #app{margin:0;padding:0}
+  @page{size:A4;margin:14mm}
+  body.imprimindo{background:#fff!important}
+  body.imprimindo>*:not(#relatorioPdf){display:none!important}
+  body.imprimindo #relatorioPdf{display:block}
+  #relatorioPdf{--ink:#121C1A;--ink-2:#43534F;--ink-3:#5A6A66;--line:#DDE3E0;--good:#00705E;--bad:#B03A26;--sunken:#EAEEEC;--surface:#fff;
+    --c1:#00897B;--c2:#B0801F;--c3:#3A6FC4;--c4:#C4523C;--c5:#7B5BC0;--c6:#5F8440;
+    color:#121C1A;background:#fff;font-family:var(--f-sans);font-size:10.5pt;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  #relatorioPdf h1{font-size:18pt;margin:2px 0 0}
+  #relatorioPdf h2{font-size:12pt;margin:16px 0 6px;color:#121C1A}
+  #relatorioPdf .rp-cab{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #7A5810;padding-bottom:8px}
+  #relatorioPdf .rp-marca{font-size:9pt;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#7A5810}
+  #relatorioPdf .rp-data{font-size:9pt;color:#5A6A66}
+  #relatorioPdf .rp-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0}
+  #relatorioPdf .rp-kpis div{border:1px solid #DDE3E0;border-radius:6px;padding:8px}
+  #relatorioPdf .rp-kpis span{display:block;font-size:8pt;text-transform:uppercase;letter-spacing:.06em;color:#5A6A66;font-weight:700}
+  #relatorioPdf .rp-kpis b{font-family:var(--f-num);font-size:12pt}
+  #relatorioPdf .rp-dois{display:grid;grid-template-columns:140px 1fr;gap:16px;align-items:center}
+  #relatorioPdf table{width:100%;border-collapse:collapse;font-size:9pt;page-break-inside:auto}
+  #relatorioPdf tr{page-break-inside:avoid}
+  #relatorioPdf th{font-size:7.5pt;text-transform:uppercase;letter-spacing:.06em;color:#5A6A66;border-bottom:1.5px solid #C2CCC8;padding:5px 6px 5px 0;text-align:left}
+  #relatorioPdf td{border-bottom:1px solid #E4E9E5;padding:5px 6px 5px 0;white-space:normal;vertical-align:top}
+  #relatorioPdf tfoot td{border-top:1.5px solid #C2CCC8;font-weight:700}
+  #relatorioPdf .tnum{text-align:right;font-family:var(--f-num);white-space:nowrap}
+  #relatorioPdf .rp-ativos td:first-child{min-width:110px}
+  #relatorioPdf small{color:#5A6A66;font-size:7.5pt}
+  #relatorioPdf .rp-cor{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px}
+  #relatorioPdf .rp-rodape{margin-top:18px;font-size:8pt;color:#5A6A66;border-top:1px solid #DDE3E0;padding-top:6px}
+  #relatorioPdf .pos{color:#00705E} #relatorioPdf .neg{color:#B03A26}
+  body:not(.imprimindo) nav.tabs,body:not(.imprimindo) .fab,body:not(.imprimindo) header.top .toprow,body:not(.imprimindo) .monthbar button{display:none!important}
+  body:not(.imprimindo) #app{margin:0;padding:0}
 }

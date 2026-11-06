@@ -219,6 +219,8 @@ function cardAtivos(){
   <div class="card span2" id="cardAtivos">
     <h3>Ativos
       <span class="btnrow" style="text-transform:none;letter-spacing:0">
+        <button class="btn sm" id="btnMov">+ Compra/venda</button>
+        <button class="btn ghost sm" id="btnPdf">PDF</button>
         <button class="btn ghost sm" id="btnImpRel">Relatórios</button>
         <button class="btn ghost sm" id="btnImpCsv">Importar CSV</button>
         ${n?'<button class="btn ghost sm" id="btnCot">↻ Atualizar</button>':''}
@@ -251,6 +253,8 @@ function ligarCardAtivos(el){
   if($('#btnCot'))$('#btnCot').onclick=()=>atualizarCotacoes();
   $('#btnImpCsv')?.addEventListener('click',()=>abrirImportCarteira());
   $('#btnImpRel')?.addEventListener('click',()=>abrirImportRelatorio());
+  $('#btnMov')?.addEventListener('click',()=>abrirMovimento());
+  $('#btnPdf')?.addEventListener('click',()=>exportarCarteiraPDF());
   $$('[data-ativo]',el).forEach(b=>b.onclick=()=>abrirAtivo(b.dataset.ativo));
 }
 
@@ -267,13 +271,16 @@ function abrirAtivo(id){
     <div class="stat"><div class="k">Cotação</div><div class="v">${m.preco?brl(Math.round(m.preco)):'—'}</div><div class="d">${a.cotacaoEm?(FONTE_NOME[a.cotacaoFonte]||'cotação')+' · '+dataHora(a.cotacaoEm):'ainda sem cotação'}</div></div>
     <div class="stat"><div class="k">Variação do dia</div><div class="v ${m.varDiaPct!==null?sinalCls(m.varDiaPct):''}">${m.varDiaPct!==null?pctS(m.varDiaPct):'—'}</div><div class="d ${m.varDia!==null?sinalCls(m.varDia):''}">${m.varDia!==null?brlS(m.varDia):''}</div></div>
   </div>
+  <div class="btnrow" style="margin-bottom:var(--s4)"><button class="btn sm" id="atComprar">${usaQtd(a)?'Comprar mais':'Aplicar'}</button><button class="btn ghost sm" id="atVender">${usaQtd(a)?'Vender':'Resgatar'}</button></div>
   ${blocoPrecoTeto(a,mt)}
+  ${(()=>{const ms=movimentos().filter(x=>x.ativoId===a.id).sort((x,y)=>y.data.localeCompare(x.data));return ms.length?`<div class="card flat" style="padding:var(--s3) var(--s4);margin-bottom:var(--s4)"><h3 style="margin-bottom:var(--s1)">Movimentações <span class="tag muted">${ms.length}</span></h3><div class="list">${ms.slice(0,6).map(itemMov).join('')}</div></div>`:''})()}
   ${blocoRendimentos(a)}`:''}
   <div class="fgroup"><label class="f" for="atNome">Nome</label><input class="inp" id="atNome" value="${a?esc(a.nome):''}" placeholder="Ex.: Tesouro IPCA+ 2035, MXRF11, IVVB11"></div>
   <div class="grid2">
     <div class="fgroup"><label class="f" for="atTicker">Ticker B3 (opcional)</label><input class="inp" id="atTicker" autocapitalize="characters" value="${a&&a.ticker?esc(a.ticker):''}" placeholder="Ex.: BBSE3, MXRF11"></div>
     <div class="fgroup"><label class="f" for="atClasse">Classe</label><select class="inp" id="atClasse">${classes.map(k=>`<option ${a&&a.classe===k?'selected':''}>${esc(k)}</option>`).join('')}</select></div>
-    <div class="fgroup"><label class="f" for="atQtd">Quantidade</label><input class="inp" id="atQtd" inputmode="decimal" value="${a&&a.qtd?String(a.qtd).replace('.',','):''}" placeholder="0"></div>
+    <div class="fgroup"><label class="f" for="atQtd">Quantidade</label><input class="inp" id="atQtd" inputmode="decimal" value="${a&&a.qtd?String(a.qtd).replace('.',','):''}" placeholder="0" ${a?'aria-describedby="atQtdH"':''}>
+      ${a?'<div class="hint" id="atQtdH">Mudou a quantidade? Eu registro como compra ou venda pela cotação. Para o preço exato, use <b>Lançar compra/venda</b>.</div>':''}</div>
     <div class="fgroup"><label class="f" for="atPm">Preço médio (R$)</label><input class="inp" id="atPm" inputmode="decimal" value="${a?campoMoney(a.precoMedio):''}" placeholder="opcional"></div>
     <div class="fgroup"><label class="f" for="atValor">Valor atual (R$)</label><input class="inp" id="atValor" inputmode="decimal" value="${a?campoMoney(a.valor):''}" placeholder="0,00" aria-describedby="atValorH">
       <div class="hint" id="atValorH">Com ticker e quantidade, vira quantidade × cotação.</div></div>
@@ -292,12 +299,15 @@ function abrirAtivo(id){
   <button class="btn" id="atSalvar">${a?'Salvar':'Adicionar'}</button>
   ${a?'<button class="btn ghost danger-txt" id="atExcluir" style="margin-top:8px">Remover ativo</button>':''}`);
   $('#atRel')?.addEventListener('click',()=>abrirImportRelatorio(a.ticker));
+  $('#atComprar')?.addEventListener('click',()=>abrirMovimento(a.id,usaQtd(a)?'compra':'aplicacao'));
+  $('#atVender')?.addEventListener('click',()=>abrirMovimento(a.id,usaQtd(a)?'venda':'resgate'));
   $('#atSalvar').onclick=()=>{
     const nome=normDesc($('#atNome').value), classe=$('#atClasse').value;
     const ticker=limparTicker($('#atTicker').value);
     const qtd=parseQtd($('#atQtd').value);
     if(!nome&&!ticker){toast('Dê um nome ao ativo');$('#atNome').focus();return}
     let alvo;
+    const antes=a?{qtd:a.qtd||0,precoMedio:a.precoMedio||0,investido:a.investido||0}:null;
     if(a){alvo=a}
     else{alvo={id:uid(),nome:'',valor:0,classe};S.ativos.push(alvo)}
     alvo.nome=nome||ticker;alvo.valor=parseMoney($('#atValor').value);alvo.classe=classe;
@@ -312,7 +322,9 @@ function abrirAtivo(id){
     if(mudouTicker&&typeof aplicarCotacoesRobo==='function')aplicarCotacoesRobo();
     if(alvo.ticker&&alvo.qtd&&alvo.cotacao)alvo.valor=Math.round(alvo.qtd*alvo.cotacao);
     else if(!alvo.valor&&alvo.qtd&&alvo.precoMedio)alvo.valor=Math.round(alvo.qtd*alvo.precoMedio);
-    salvar();fecharSheet();render();toast(a?'Ativo atualizado':'Ativo adicionado');
+    const ajustes=antes?registrarAjuste(alvo,antes):[];
+    salvar();fecharSheet();render();
+    toast(ajustes.length?ajustes.map(m=>TIPO_MOV[m.tipo]+' de '+(m.qtd?Number(m.qtd).toLocaleString('pt-BR')+' × '+brl(m.preco):brl(m.valor))).join(' · ')+' registrada':(a?'Ativo atualizado':'Ativo adicionado'));
     if(alvo.ticker&&alvo.qtd&&mudouTicker)atualizarCotacoes({silencioso:true});
   };
   if(a)$('#atExcluir').onclick=()=>confirmar({titulo:'Remover '+a.nome+'?',perigo:true,botao:'Remover ativo',
