@@ -574,6 +574,18 @@ function renderConfig(){
     <div class="fgroup"><label class="f" for="cfgTema">Tema</label>
       <select class="inp" id="cfgTema">${[['','Automático (segue o aparelho)'],['light','Claro'],['dark','Escuro'],['amoled','AMOLED — preto puro']].map(([v,n])=>`<option value="${v}" ${(S.ui.tema||'')===v?'selected':''}>${n}</option>`).join('')}</select></div>
     <div class="sub">O AMOLED usa preto absoluto: fica mais confortável à noite e economiza bateria em telas OLED.</div>
+    <div class="fgroup" style="margin-top:var(--s3)"><label class="f" for="cfgVersao">Layout</label>
+      <select class="inp" id="cfgVersao"><option value="" ${S.ui.versao!=='computador'?'selected':''}>Automático (celular ou computador pelo tamanho da tela)</option>
+        <option value="computador" ${S.ui.versao==='computador'?'selected':''}>Sempre versão computador</option></select></div>
+    <div class="sub">A versão computador no celular mostra a barra lateral, 2 colunas e o home broker completo. Use dois dedos para aproximar.</div>
+  </div>
+  <div class="card">
+    <h3>Instalar como aplicativo</h3>
+    ${instalado()?`<div class="okbox"><b>Você está usando o app instalado.</b> Ele abre em janela própria e funciona sem internet; os dados são os mesmos do navegador.</div>`
+    :podeInstalar()?`<div class="sub" style="margin-bottom:var(--s3)">Instale o Liberdade 65 no computador (ou na tela inicial do celular): abre em janela própria, com ícone, e funciona sem internet. Os dados continuam os mesmos.</div>
+      <button class="btn" id="btnInstalar">${svgIc('baixar',18)} Instalar Liberdade 65</button>`
+    :/^https?:$/.test(location.protocol)?`<div class="sub">Para instalar:<br>• <b>Computador (Chrome ou Edge):</b> clique no ícone de instalar na barra de endereço (⊕ ou 🖥️), ou menu ⋮ → <b>Instalar Liberdade 65</b> / <b>Aplicativos → Instalar este site</b>.<br>• <b>Android (Chrome):</b> menu ⋮ → <b>Instalar app</b> ou <b>Adicionar à tela inicial</b>.<br>• <b>iPhone (Safari):</b> Compartilhar → <b>Adicionar à Tela de Início</b>.</div>`
+    :`<div class="sub">Para instalar como aplicativo, abra pelo endereço da sua página (<b>fernandoaraujoflorencio-droid.github.io/liberdade65</b>). Aberto pelo arquivo do computador, o navegador não permite instalar.</div>`}
   </div>
   <div class="card" id="cardDados">
     <h3>Seus dados</h3>
@@ -604,6 +616,8 @@ function renderConfig(){
     toast(e.target.value.trim()?'Token salvo — buscando cotações':'Token removido');
     if(e.target.value.trim()){S.cotacoesEm=null;atualizarCotacoes({silencioso:false})}
   });
+  $('#cfgVersao').onchange=e=>trocarVersao(e.target.value);
+  $('#btnInstalar')?.addEventListener('click',()=>instalarApp());
   $('#cfgTema').onchange=e=>{S.ui.tema=e.target.value;salvar();aplicarTema(S.ui.tema);toast('Tema '+TEMA_ROTULO[S.ui.tema])};
   ligarBackup(el);
 }

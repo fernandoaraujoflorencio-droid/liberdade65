@@ -1,0 +1,23 @@
+{
+  "name": "Liberdade 65 — controle financeiro",
+  "short_name": "Liberdade 65",
+  "description": "Gastos, faturas, carteira e plano de liberdade financeira. Os dados ficam só no seu aparelho.",
+  "lang": "pt-BR",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone"],
+  "orientation": "any",
+  "background_color": "#0D1416",
+  "theme_color": "#0D1416",
+  "categories": ["finance", "productivity"],
+  "icons": [
+    { "src": "icones/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icones/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icones/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Investir", "url": "./index.html#investir", "icons": [{ "src": "icones/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Faturas", "url": "./index.html#faturas", "icons": [{ "src": "icones/icon-192.png", "sizes": "192x192" }] }
+  ]
+}

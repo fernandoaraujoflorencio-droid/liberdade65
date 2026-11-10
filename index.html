@@ -2,12 +2,16 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" id="metaViewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#F3F5F4">
 <meta name="description" content="Liberdade 65 — controle de gastos, faturas, carteira e plano de liberdade financeira. Os dados ficam só neste navegador.">
 <title>Liberdade 65</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%237A5810'/%3E%3Ctext x='32' y='42' font-family='Arial' font-weight='700' font-size='28' fill='white' text-anchor='middle'%3E65%3C/text%3E%3C/svg%3E">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icones/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Liberdade 65">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..110,400..800&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
@@ -21,6 +25,7 @@
     <h1 class="viewtitle" id="viewTitle">Painel</h1>
     <div class="toprow">
       <div class="brand"><span class="logo" aria-hidden="true">65</span><b>Liberdade 65</b><span id="brandsub">meta 65%</span></div>
+      <button class="iconbtn" id="btnDesk" aria-pressed="false" title="Versão computador" aria-label="Versão computador"></button>
       <button class="iconbtn" id="btnPriv" aria-pressed="false" title="Esconder valores" aria-label="Esconder valores"></button>
       <button class="iconbtn" id="btnTheme" title="Alternar tema" aria-label="Alternar tema"></button>
       <button class="iconbtn" id="btnCfg" title="Configurações" aria-label="Configurações">

@@ -86,7 +86,7 @@ function abrirRestaurar(txt,nomeArq){
     if(temDados())baixarCopiaSeguranca('antes-de-restaurar');
     S=deepMerge(structuredClone(DEFAULT),r.dados);
     aplicarCotacoesRobo();
-    salvarAgora();fecharSheet();aplicarTema(S.ui.tema||'');aplicarPrivado();
+    salvarAgora();fecharSheet();aplicarTema(S.ui.tema||'');aplicarPrivado();aplicarVersao();
 aplicarPrivado();
     $('#brandsub').textContent='meta '+Math.round(S.perfil.metaPoupanca*100)+'%';
     render();toast('Backup restaurado: '+z.lanc+' lançamentos, '+z.cartoes+' cartões, '+z.ativos+' ativos');
@@ -180,9 +180,43 @@ function aplicarPrivado(){
 }
 $('#btnPriv').onclick=()=>{S.ui.privado=!S.ui.privado;salvar();aplicarPrivado();render();toast(S.ui.privado?'Valores escondidos — só porcentagens aparecem':'Valores visíveis')};
 
+/* versão computador: no celular, mostra o layout completo (como "site para computador") */
+const VIEWPORT_NORMAL='width=device-width, initial-scale=1, viewport-fit=cover';
+function aplicarVersao(){
+  const comp=S.ui.versao==='computador';
+  $('#metaViewport').setAttribute('content',comp?'width=1280, initial-scale='+Math.min(1,(screen.width||1280)/1280).toFixed(3):VIEWPORT_NORMAL);
+  document.documentElement.classList.toggle('versao-computador',comp);
+  const b=$('#btnDesk');
+  b.innerHTML=svgIc(comp?'celular':'monitor',18);
+  b.setAttribute('aria-pressed',String(comp));
+  b.setAttribute('aria-label',comp?'Voltar para a versão celular':'Versão computador');
+  b.title=comp?'Voltar para a versão celular':'Versão computador';
+}
+function trocarVersao(v){S.ui.versao=v;salvarAgora();aplicarVersao();setTimeout(()=>{render();toast(v==='computador'?'Versão computador — toque no celular 📱 para voltar':'Versão celular')},60)}
+$('#btnDesk').onclick=()=>trocarVersao(S.ui.versao==='computador'?'':'computador');
+
+/* app instalável (computador e celular): só funciona aberto pelo endereço https */
+let pedidoInstalar=null;
+const podeInstalar=()=>!!pedidoInstalar;
+const instalado=()=>matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();pedidoInstalar=e;if(S.ui.tab==='config')render()});
+window.addEventListener('appinstalled',()=>{pedidoInstalar=null;toast('Liberdade 65 instalado');if(S.ui.tab==='config')render()});
+async function instalarApp(){
+  if(!pedidoInstalar)return;
+  pedidoInstalar.prompt();
+  const r=await pedidoInstalar.userChoice.catch(()=>null);
+  if(r&&r.outcome==='accepted')toast('Instalando…');
+  pedidoInstalar=null;render();
+}
+if('serviceWorker' in navigator&&/^https?:$/.test(location.protocol)){
+  navigator.serviceWorker.register('sw.js').catch(()=>{});
+}
+
 /* ---------- inicialização ---------- */
 aplicarTema(S.ui.tema||'');
 aplicarPrivado();
+aplicarVersao();
+{const h=location.hash.slice(1);if(h in VIEWS)S.ui.tab=h}
 if(aplicarCotacoesRobo())salvar();
 $('#brandsub').textContent='meta '+Math.round(S.perfil.metaPoupanca*100)+'%';
 render();

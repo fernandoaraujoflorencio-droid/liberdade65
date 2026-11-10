@@ -506,6 +506,11 @@ details.importar>summary::-webkit-details-marker{display:none}
 details.importar>summary::after{content:"+";color:var(--ink-3);font-size:18px}
 details.importar[open]>summary::after{content:"−"}
 button.item.parc{align-items:flex-start}
+@media (max-width:430px){#brandsub{display:none}}
+/* botão versão computador: só aparece em tela estreita (ou quando já está ligado) */
+@media (min-width:960px){html:not(.versao-computador) #btnDesk{display:none}}
+#btnDesk[aria-pressed="true"]{color:var(--accent);border-color:var(--accent)}
+.btn svg{flex:none}
 /* modo privado */
 body.privado :is(input[data-money],#txVal,#atValor,#atInv,#atPm,#atQtd,#mvValor,#mvQtd,#mvTaxas,#cLimite,.lim,#s1meta,#s2ap,#s3v,#s4v,#cfgToken,#impTexto,#csvTexto):not(:focus){color:transparent;text-shadow:0 0 9px color-mix(in srgb,var(--ink) 70%,transparent)}
 #btnPriv[aria-pressed="true"]{color:var(--accent);border-color:var(--accent)}
