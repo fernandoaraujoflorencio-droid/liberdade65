@@ -84,7 +84,11 @@ function ligarFiltros(el){
 }
 
 /* ---------- gráficos de preço ---------- */
-const histDe=t=>{const C=typeof cotacoesRobo==='function'?cotacoesRobo():null;const h=C&&C.ativos[t]&&C.ativos[t].hist;return Array.isArray(h)?h.filter(p=>p&&p[1]>0):[]};
+/* histórico: formato do robô privado (hist:[[data,fech]]) ou compacto do público (datas + h:[fech]) */
+const histDe=t=>{const C=typeof cotacoesRobo==='function'?cotacoesRobo():null, e=C&&C.ativos[t];if(!e)return [];
+  if(Array.isArray(e.hist))return e.hist.filter(p=>p&&p[1]>0);
+  if(Array.isArray(e.h)&&Array.isArray(C.datas))return e.h.map((v,i)=>[C.datas[i],v]).filter(p=>p[0]&&p[1]>0);
+  return []};
 function sparkline(hist,{w=96,h=28}={}){
   if(hist.length<2)return '<span class="muted" aria-hidden="true">—</span>';
   const v=hist.map(p=>p[1]), min=Math.min(...v), max=Math.max(...v), r=max-min||1;

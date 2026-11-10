@@ -9,3 +9,7 @@ App de controle financeiro: gastos, faturas de cartão, carteira de investimento
 Este repositório tem **só o código** do app. Nenhum dado financeiro fica aqui nem em servidor nenhum: lançamentos, cartões, carteira e o token da brapi.dev ficam guardados **apenas no navegador de quem usa** (`localStorage`). Quem abre o link vê o app vazio, com os próprios dados.
 
 Faça backup em **Configurações → Exportar backup** e guarde o arquivo fora daqui. Nunca envie arquivos de backup (`liberdade65-backup-*.json`) para este repositório.
+
+## Cotações e gráficos
+
+Um robô gratuito (GitHub Actions) atualiza `cotacoes.js` de segunda a sexta às 18h30 com o preço e o histórico de 3 meses de uma **lista ampla de ativos da B3** (`universo.txt`: Ibovespa, small caps, FIIs e ETFs). É uma lista genérica, **não a carteira de ninguém** — o app só usa os ativos que cada pessoa cadastrou no próprio navegador. Fonte: Yahoo Finance (yfinance).
