@@ -114,7 +114,9 @@ async function buscarCotacao(t,token){
       const d=it.data||it;
       const preco=+d.regularMarketPrice;
       if(!isFinite(preco)||preco<=0){ultimoErro='dados';continue}
-      return{preco,variacao:+d.regularMarketChangePercent||0,quando:d.regularMarketTime||new Date().toISOString()};
+      return{preco,variacao:+d.regularMarketChangePercent||0,quando:d.regularMarketTime||new Date().toISOString(),
+        max:+d.regularMarketDayHigh||0,min:+d.regularMarketDayLow||0,ant:+d.regularMarketPreviousClose||0,vol:+d.regularMarketVolume||0,
+        max52:+d.fiftyTwoWeekHigh||0,min52:+d.fiftyTwoWeekLow||0};
     }catch(e){if(ultimoErro!=='token')ultimoErro='rede'}
   }
   throw new Error(ultimoErro);
@@ -128,6 +130,10 @@ function aplicarCotacao(a,q){
   a.variacao=isFinite(q.variacao)?q.variacao:0;
   a.cotacaoEm=new Date(novo).toISOString();
   a.cotacaoFonte=q.fonte;
+  /* dados do dia (opcionais): mínima, máxima, fechamento anterior, volume, 52 semanas */
+  const c=x=>x>0?Math.round(x*10000)/100:null;
+  for(const[k,v]of[['cotMax',c(q.max)],['cotMin',c(q.min)],['cotAnt',c(q.ant)],['max52',c(q.max52)],['min52',c(q.min52)]]){if(v)a[k]=v;else delete a[k]}
+  if(q.vol>0)a.cotVol=Math.round(q.vol);else delete a.cotVol;
   if(a.qtd>0)a.valor=Math.round(a.qtd*a.cotacao);
   return true;
 }
@@ -184,7 +190,7 @@ function aplicarCotacoesRobo(){
   for(const a of S.ativos){
     if(!a.ticker)continue;
     const q=C.ativos[a.ticker]; if(!q)continue;
-    if(aplicarCotacao(a,{preco:+q.preco,variacao:+q.variacao,quando:q.data||C.atualizado_em,fonte:'robo'}))n++;
+    if(aplicarCotacao(a,{preco:+q.preco,variacao:+q.variacao,quando:q.data||C.atualizado_em,fonte:'robo',max:+q.max,min:+q.min,ant:+q.ant,vol:+q.vol,max52:+q.max52,min52:+q.min52}))n++;
   }
   return n;
 }
@@ -203,8 +209,7 @@ function cardAtivos(){
   const n=S.ativos.filter(a=>a.ticker&&a.qtd>0).length;
   const falhas=(S.cotacoesFalhas||[]).filter(t=>S.ativos.some(a=>a.ticker===t));
   const erro=S.cotacoesErro&&falhas.length?S.cotacoesErro:null;
-  const lista=[...S.ativos].sort((a,b)=>b.valor-a.valor);
-  const qtdTxt=q=>Number(q).toLocaleString('pt-BR',{maximumFractionDigits:8});
+  const qtdTxt=fmtQtd;
   return `
   <div class="card span2" id="cardCarteira">
     <h3>Resumo da carteira <span class="tag muted">${S.ativos.length} ativo${S.ativos.length===1?'':'s'}</span></h3>
@@ -228,14 +233,19 @@ function cardAtivos(){
     <div class="sub" style="margin-bottom:var(--s3)" id="cotStatus">${n?(S.cotacoesEm?'Última busca na brapi.dev: <b>'+dataHora(S.cotacoesEm)+'</b> · '+n+' ativo'+(n>1?'s':'')+' com cotação automática':'Cotações ainda não buscadas na brapi.dev'):'Para atualizar sozinho, edite o ativo e informe ticker e quantidade.'}
       ${typeof resumoRobo==='function'?resumoRobo():''}</div>
     ${erro?`<div class="warnbox" role="alert" style="margin-bottom:var(--s3)"><b>Sem cotação nova para ${falhas.map(esc).join(', ')}.</b> ${MSG_ERRO_COT[erro.tipo]||MSG_ERRO_COT.dados} Mantive o último preço salvo de cada um.</div>`:''}
-    <div class="carteira-head" aria-hidden="true"><span></span><span>Ativo</span><span>Qtd × preço</span><span>Valor atual</span><span>Resultado</span><span>Dia</span><span>Peso</span></div>
+    ${barraFiltros()}
+    ${(()=>{const f=filtroAtivos(), lst=ativosFiltrados();
+      if(!lst.length)return vazio({ic:'lista',t:'Nenhum ativo neste filtro',p:'Mude a classe ou a busca.'});
+      if(f.vista==='broker')return tabelaBroker(lst);
+      if(f.vista==='mapa')return mapaCarteira(lst);
+      return `<div class="carteira-head" aria-hidden="true"><span></span><span>Ativo</span><span>Qtd × preço</span><span>Valor atual</span><span>Resultado</span><span>Dia</span><span>Peso</span></div>
     <div class="list">
-    ${lista.map(a=>{
-      const m=metricasAtivo(a,T.total);
-      const preco=m.preco?brl(Math.round(m.preco)):null;
+    ${lst.map(({a,m})=>{
+      const preco=m.preco?brl(Math.round(m.preco),{real:true}):null;
       const fonte=a.cotacaoEm?`${FONTE_NOME[a.cotacaoFonte]||'cotação'} · ${dataHora(a.cotacaoEm)}`:'';
-      const mt=metodosTeto(a);
-      const selos=seloTeto('Preço teto',mt.mediana,m.preco)+(a.relatorios?.length?`<span class="selo neutral">${a.relatorios.length} relatório${a.relatorios.length>1?'s':''}</span>`:'');
+      const mt=metodosTeto(a), rf=!a.ticker?rfInfo(a):null;
+      const selos=seloTeto('Preço teto',mt.mediana,m.preco)+(a.relatorios?.length?`<span class="selo neutral">${a.relatorios.length} relatório${a.relatorios.length>1?'s':''}</span>`:'')
+        +(rf?`<span class="selo neutral">${esc(rf.texto)} · ≈ ${pct(rf.aa,1)} a.a.</span>`:'');
       return `<button class="ativo" data-ativo="${a.id}" aria-label="${esc(a.nome)}, valor ${brl(m.valor)}${m.lucro!==null?', resultado '+brlS(m.lucro):''}">
         <span class="tk" aria-hidden="true">${esc((a.ticker||a.nome).slice(0,5).toUpperCase())}</span>
         <span class="nm">${esc(a.nome)}</span>
@@ -246,7 +256,7 @@ function cardAtivos(){
         <span class="col-dia ${m.varDiaPct!==null?sinalCls(m.varDiaPct):'zero'}">${m.varDiaPct!==null?pctS(m.varDiaPct)+'<br>'+brlS(m.varDia):'—'}</span>
         <span class="col-peso">${pct(m.peso,1)}</span>
         <span class="selos">${selos}</span>
-      </button>`}).join('')}</div>
+      </button>`}).join('')}</div>`})()}
   </div>`;
 }
 function ligarCardAtivos(el){
@@ -256,6 +266,8 @@ function ligarCardAtivos(el){
   $('#btnMov')?.addEventListener('click',()=>abrirMovimento());
   $('#btnPdf')?.addEventListener('click',()=>exportarCarteiraPDF());
   $$('[data-ativo]',el).forEach(b=>b.onclick=()=>abrirAtivo(b.dataset.ativo));
+  $$('[data-broker]',el).forEach(b=>b.onclick=()=>abrirBroker(b.dataset.broker));
+  ligarFiltros(el);
 }
 
 /* ---------- folha do ativo ---------- */
@@ -287,6 +299,17 @@ function abrirAtivo(id){
     <div class="fgroup"><label class="f" for="atInv">Valor investido (R$)</label><input class="inp" id="atInv" inputmode="decimal" value="${a?campoMoney(a.investido):''}" placeholder="sem quantidade" aria-describedby="atInvH">
       <div class="hint" id="atInvH">Só para ativos sem quantidade (ex.: Tesouro, CDB).</div></div>
   </div>
+  ${(()=>{const rf=a?(a.rf||detectarRF(a.nome)):null, abre=a&&!a.ticker&&(a.classe==='Renda fixa'||rf);
+    return `<details class="acc" style="margin-bottom:var(--s3)" id="atRfBox" ${abre?'open':''}><summary>Renda fixa: taxa, vencimento e liquidez</summary><div class="body">
+    <div class="grid2">
+      <div class="fgroup"><label class="f" for="atRfIdx">Indexador</label><select class="inp" id="atRfIdx">${Object.entries(RF_IDX).map(([k,n])=>`<option value="${k}" ${(rf?.indexador||'cdi')===k?'selected':''}>${n}</option>`).join('')}</select></div>
+      <div class="fgroup"><label class="f" for="atRfTaxa">Taxa (%)</label><input class="inp" id="atRfTaxa" inputmode="decimal" value="${rf?.taxa?String(rf.taxa).replace('.',','):''}" placeholder="ex.: 120 (do CDI) ou 6 (IPCA+)" aria-describedby="atRfH"></div>
+      <div class="fgroup"><label class="f" for="atRfVenc">Vencimento</label><input class="inp" id="atRfVenc" type="date" value="${rf?.vencimento||''}"></div>
+      <div class="fgroup"><label class="f" for="atRfLiq">Liquidez</label><select class="inp" id="atRfLiq"><option value="diaria" ${rf?.liquidez==='diaria'?'selected':''}>Diária</option><option value="vencimento" ${rf?.liquidez==='vencimento'?'selected':''}>No vencimento</option></select></div>
+    </div>
+    <label class="row" style="justify-content:flex-start;gap:var(--s2);font-size:var(--t-sm)"><input type="checkbox" id="atRfIsento" ${rf?.isento?'checked':''} style="width:18px;height:18px;accent-color:var(--accent)"> Isento de IR (LCI, LCA, CRI, CRA)</label>
+    <div class="hint" id="atRfH" style="margin-top:var(--s2)">${rf&&!a.rf?'Preenchi pelo nome do título — confira. ':''}Com a taxa, eu mostro quanto o título rende por mês (CDI e IPCA mudam em Configurações).</div>
+    </div></details>`})()}
   <details class="acc" style="margin-bottom:var(--s4)" ${a&&(a.dpa||a.lpa||a.vpa)?'open':''}><summary>Indicadores para o preço teto (opcional)</summary><div class="body">
     <div class="grid2" style="grid-template-columns:repeat(3,minmax(0,1fr))">
       <div class="fgroup"><label class="f" for="atDpa">DPA 12 meses</label><input class="inp" id="atDpa" inputmode="decimal" value="${a?campoMoney(a.dpa):''}" placeholder="R$ por ação"></div>
@@ -315,6 +338,9 @@ function abrirAtivo(id){
     if(ticker)alvo.ticker=ticker;else delete alvo.ticker;
     if(qtd>0)alvo.qtd=qtd;else delete alvo.qtd;
     const opc={precoMedio:'#atPm',investido:'#atInv',dpa:'#atDpa',lpa:'#atLpa',vpa:'#atVpa'};
+    const rfTaxa=parseNumero($('#atRfTaxa').value);
+    if(rfTaxa>0)alvo.rf={indexador:$('#atRfIdx').value,taxa:rfTaxa,vencimento:$('#atRfVenc').value||'',liquidez:$('#atRfLiq').value,isento:$('#atRfIsento').checked};
+    else delete alvo.rf;
     const dpaAntes=alvo.dpa||0;
     for(const[k,sel]of Object.entries(opc)){const v=parseMoney($(sel).value);if(v>0)alvo[k]=v;else delete alvo[k]}
     if((alvo.dpa||0)!==Math.round(dpaAntes))delete alvo.dpaFonte; /* DPA digitado à mão */
@@ -420,7 +446,7 @@ function revisarImportCarteira(itens,erros){
   <div class="tblwrap" style="max-height:46vh;overflow-y:auto"><table>
     <caption class="sr-only">Ativos que serão importados</caption>
     <thead><tr><th scope="col">Ticker</th><th scope="col" class="tnum">Qtd</th><th scope="col" class="tnum">Preço médio</th><th scope="col">Classe</th><th scope="col"></th></tr></thead>
-    <tbody>${itens.map(i=>`<tr><td><b>${esc(i.ticker)}</b></td><td class="tnum">${i.qtd.toLocaleString('pt-BR',{maximumFractionDigits:8})}</td>
+    <tbody>${itens.map(i=>`<tr><td><b>${esc(i.ticker)}</b></td><td class="tnum">${fmtQtd(i.qtd)}</td>
       <td class="tnum">${i.precoMedio?brl(i.precoMedio):'—'}</td><td>${esc(i.classe)}</td>
       <td>${existe(i.ticker)?'<span class="selo neutral">atualiza</span>':'<span class="selo ok">novo</span>'}</td></tr>`).join('')}</tbody>
   </table></div>

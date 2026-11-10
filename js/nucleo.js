@@ -9,13 +9,18 @@ const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelect
 const uid=()=>Math.random().toString(36).slice(2,10);
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
-/* ---------- dinheiro ---------- */
+/* ---------- dinheiro ----------
+   Modo privado (S.ui.privado): todo valor em reais e toda quantidade vira "••••";
+   porcentagens (rentabilidade, variação, peso) continuam visíveis. */
+let modoPrivado=false;
+const MASCARA='••••,••';
 const brl=(c,opt={})=>{
+  if(modoPrivado&&!opt.real)return (opt.sign&&c>0?'+':'')+(opt.noPrefix?MASCARA:'R$ '+MASCARA);
   const v=(c||0)/100;
   const s=v.toLocaleString('pt-BR',{minimumFractionDigits:opt.dec===0?0:2,maximumFractionDigits:opt.dec===0?0:2});
   return (opt.sign&&c>0?'+':'')+(opt.noPrefix?'':'R$ ')+s;
 };
-const brlK=c=>{const v=Math.abs(c||0)/100;const sg=c<0?'−':'';
+const brlK=c=>{if(modoPrivado)return 'R$ ••••';const v=Math.abs(c||0)/100;const sg=c<0?'−':'';
   if(v>=1e6)return sg+'R$ '+(v/1e6).toLocaleString('pt-BR',{maximumFractionDigits:2})+' mi';
   if(v>=10000)return sg+'R$ '+(v/1000).toLocaleString('pt-BR',{maximumFractionDigits:1})+' mil';
   return sg+'R$ '+v.toLocaleString('pt-BR',{maximumFractionDigits:0});};
@@ -25,6 +30,9 @@ const sinalCls=v=>v>0?'pos':(v<0?'neg':'zero');
 const brlS=(c,opt={})=>(c>0?'+':(c<0?'−':''))+brl(Math.abs(c||0),opt);
 const pctS=(x,d=2)=>(x>0?'+':(x<0?'−':''))+pct(Math.abs(x||0),d);
 const comSinal=(html,v)=>`<span class="${sinalCls(v)}">${html}</span>`;
+
+/* quantidade de cotas/ações (também escondida no modo privado) */
+const fmtQtd=q=>modoPrivado?'••••':Number(q||0).toLocaleString('pt-BR',{maximumFractionDigits:8});
 
 /* número no formato brasileiro ou internacional → float */
 function parseNumero(s){
@@ -172,6 +180,8 @@ const ICONE={
   cartao:'<rect x="2.5" y="5.5" width="19" height="13" rx="2.5"/><path d="M2.5 10h19M6.5 14.5h3"/>',
   lista:'<path d="M8 6h12M8 12h12M8 18h12"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/>',
   check:'<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  olho:'<path d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>',
+  olhoX:'<path d="M4 4l16 16"/><path d="M9.9 5.7A9.6 9.6 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a17 17 0 0 1-2.9 3.6M6.5 7.6C4 9.4 2.5 12 2.5 12S6 18.5 12 18.5c1.6 0 3-.4 4.2-1"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/>',
   escudo:'<path d="M12 3l7.5 3v5.5c0 4.6-3.2 8.2-7.5 9.5-4.3-1.3-7.5-4.9-7.5-9.5V6z"/><path d="M9 12l2.2 2.2L15.5 10"/>',
   x:'<path d="M6 6l12 12M18 6L6 18"/>',
   sol:'<circle cx="12" cy="12" r="4.2"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"/>',

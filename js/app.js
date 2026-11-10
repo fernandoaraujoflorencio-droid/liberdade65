@@ -86,7 +86,8 @@ function abrirRestaurar(txt,nomeArq){
     if(temDados())baixarCopiaSeguranca('antes-de-restaurar');
     S=deepMerge(structuredClone(DEFAULT),r.dados);
     aplicarCotacoesRobo();
-    salvarAgora();fecharSheet();aplicarTema(S.ui.tema||'');
+    salvarAgora();fecharSheet();aplicarTema(S.ui.tema||'');aplicarPrivado();
+aplicarPrivado();
     $('#brandsub').textContent='meta '+Math.round(S.perfil.metaPoupanca*100)+'%';
     render();toast('Backup restaurado: '+z.lanc+' lançamentos, '+z.cartoes+' cartões, '+z.ativos+' ativos');
   };
@@ -167,8 +168,21 @@ $('#btnTheme').onclick=()=>{
   S.ui.tema=next;salvar();aplicarTema(next);toast('Tema '+TEMA_ROTULO[next]);
 };
 
+/* modo privado: esconde valores em reais e quantidades; mantém porcentagens */
+function aplicarPrivado(){
+  modoPrivado=!!S.ui.privado;
+  document.body.classList.toggle('privado',modoPrivado);
+  const b=$('#btnPriv');
+  b.innerHTML=svgIc(modoPrivado?'olhoX':'olho',18);
+  b.setAttribute('aria-pressed',String(modoPrivado));
+  b.setAttribute('aria-label',modoPrivado?'Mostrar valores':'Esconder valores');
+  b.title=modoPrivado?'Mostrar valores':'Esconder valores (só porcentagens)';
+}
+$('#btnPriv').onclick=()=>{S.ui.privado=!S.ui.privado;salvar();aplicarPrivado();render();toast(S.ui.privado?'Valores escondidos — só porcentagens aparecem':'Valores visíveis')};
+
 /* ---------- inicialização ---------- */
 aplicarTema(S.ui.tema||'');
+aplicarPrivado();
 if(aplicarCotacoesRobo())salvar();
 $('#brandsub').textContent='meta '+Math.round(S.perfil.metaPoupanca*100)+'%';
 render();

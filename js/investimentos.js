@@ -92,7 +92,7 @@ function abrirMovimento(ativoId,tipoInicial){
     $('#mvClasseBox').hidden=!!a||!$('#mvAtivo').value.trim();
     $('#mvOrcBox').hidden=!ent;
     if(!a&&$('#mvAtivo').value.trim()){$('#mvClasse').value=q?mapClasse('',limparTicker($('#mvAtivo').value)):'Renda fixa'}
-    $('#mvInfo').innerHTML=a?(q?`Você tem <b>${Number(a.qtd||0).toLocaleString('pt-BR',{maximumFractionDigits:8})}</b> · preço médio ${a.precoMedio?brl(a.precoMedio):'—'}${a.cotacao?' · cotação '+brl(Math.round(a.cotacao)):''}`
+    $('#mvInfo').innerHTML=a?(q?`Você tem <b>${fmtQtd(a.qtd)}</b> · preço médio ${a.precoMedio?brl(a.precoMedio):'—'}${a.cotacao?' · cotação '+brl(Math.round(a.cotacao)):''}`
       :`Saldo ${brl(a.valor)}${a.investido?' · investido '+brl(a.investido):''}`):($('#mvAtivo').value.trim()?'Ativo novo — será criado na carteira.':'');
     if(q&&a&&!$('#mvPreco').value&&a.cotacao)$('#mvPreco').placeholder=campoMoney(Math.round(a.cotacao));
     const tot=Math.round(parseQtd($('#mvQtd').value)*parseMoney($('#mvPreco').value)+(ent?1:-1)*parseMoney($('#mvTaxas').value));
@@ -158,7 +158,7 @@ function itemMov(m){
   return `<div class="item">
     <div class="ic" aria-hidden="true" style="background:${ent?'var(--good-soft)':'var(--bad-soft)'};color:${ent?'var(--good)':'var(--bad)'};font-weight:800">${ent?'+':'−'}</div>
     <div class="mid"><div class="t">${esc(TIPO_MOV[m.tipo])} · ${esc(m.ticker||m.nome)}</div>
-      <div class="s">${dLabel(m.data)}${m.qtd?' · '+Number(m.qtd).toLocaleString('pt-BR',{maximumFractionDigits:8})+' × '+brl(m.preco):''}${m.origem==='ajuste'?' · ajuste':''}${m.resultado?` · resultado <span class="${sinalCls(m.resultado)}">${brlS(m.resultado)}</span>`:''}</div></div>
+      <div class="s">${dLabel(m.data)}${m.qtd?' · '+fmtQtd(m.qtd)+' × '+brl(m.preco,{real:true}):''}${m.origem==='ajuste'?' · ajuste':''}${m.resultado?` · resultado <span class="${sinalCls(m.resultado)}">${brlS(m.resultado)}</span>`:''}</div></div>
     <div class="val ${ent?'pos':'neg'}">${ent?'+':'−'}${brl(m.valor,{noPrefix:true})}</div>
   </div>`;
 }
@@ -233,7 +233,7 @@ function gerarRelatorioCarteira(){
   const tot=Object.values(cls).reduce((a,b)=>a+b,0);
   const somaAlvo=Object.values(S.alocacaoAlvo).reduce((a,b)=>a+b,0)||100;
   const lista=[...S.ativos].sort((a,b)=>b.valor-a.valor);
-  const qtdTxt=q=>q?Number(q).toLocaleString('pt-BR',{maximumFractionDigits:8}):'—';
+  const qtdTxt=q=>q?fmtQtd(q):'—';
   const agora=new Date();
   const dados=Object.entries(cls).filter(([,v])=>v>0).map(([n,v])=>({n,v}));
   return `<header class="rp-cab"><div><div class="rp-marca">Liberdade 65</div><h1>Relatório da carteira</h1></div>

@@ -172,62 +172,79 @@ function itemTx(t){
   </button>`;
 }
 
+let faturaVista='categorias';
 function renderFaturas(){
   const ym=S.ui.ym, el=$('#v-faturas');
   const futuro=comprometidoFuturo(addMonthYM(ym,1));
   const mesesFut=Object.keys(futuro).sort().slice(0,12);
   const totalFut=mesesFut.reduce((a,m)=>a+futuro[m],0);
-  const maxFut=Math.max(...mesesFut.map(m=>futuro[m]),1);
   const temCartao=S.cartoes.length>0;
+  const txs=S.transacoes.filter(t=>t.cartaoId&&t.competencia===ym&&t.valor<0);
+  const totMes=-txs.reduce((a,t)=>a+t.valor,0);
+  const parc=txs.filter(t=>t.parcelaDe>1);
+
+  const vistas={
+    categorias:()=>{const gs=gruposPorCategoria(txs);
+      return `<div class="empilhada" style="margin-bottom:var(--s3)" role="img" aria-label="Divisão da fatura por categoria">${gs.slice(0,6).map((g,i)=>`<i style="width:${(g.total/totMes*100).toFixed(1)}%;background:${COR[i%6]}" title="${esc(g.cat.nome)}"></i>`).join('')}</div>
+      ${gs.map((g,i)=>`<details class="grupo"><summary><i style="width:10px;height:10px;border-radius:3px;background:${COR[i%6]};flex:none"></i>
+        <span class="gnome">${g.cat.ic} ${esc(g.cat.nome)}</span><span class="gqtd">${g.itens.length} · ${pct(g.total/totMes,0)}</span><span class="gval">${brl(g.total)}</span></summary>
+        <div class="gcorpo"><div class="list">${g.itens.map(itemTx).join('')}</div></div></details>`).join('')}`},
+    lancamentos:()=>{const dias={};[...txs].sort((a,b)=>b.data.localeCompare(a.data)).forEach(t=>{(dias[t.data]=dias[t.data]||[]).push(t)});
+      return Object.entries(dias).map(([d,arr])=>`<div class="daygroup"><span>${dLabel(d)}</span><span class="num">${brl(-arr.reduce((a,t)=>a+t.valor,0))}</span></div>
+        <div class="list">${arr.map(itemTx).join('')}</div>`).join('')},
+    parcelas:()=>parc.length?`<div class="list">${[...parc].sort((a,b)=>(b.parcelaDe-b.parcelaN)*-b.valor-(a.parcelaDe-a.parcelaN)*-a.valor).map(t=>{
+        const falta=(t.parcelaDe-t.parcelaN)*-t.valor;
+        return `<button class="item parc" data-tx="${t.id}">
+          <div class="mid"><div class="t">${esc(t.desc)}</div>
+            <div class="bar" style="height:5px;margin:6px 0 4px"><i style="width:${(t.parcelaN/t.parcelaDe*100).toFixed(0)}%;background:var(--warn)"></i></div>
+            <div class="s">parcela ${t.parcelaN} de ${t.parcelaDe} · ${falta?'faltam '+brl(falta):'última parcela'}</div></div>
+          <div class="val neg">−${brl(-t.valor,{noPrefix:true})}</div></button>`}).join('')}</div>
+        <div class="sub" style="margin-top:var(--s2)">Ainda vão cair <b class="num" style="color:var(--ink)">${brl(parc.reduce((a,t)=>a+(t.parcelaDe-t.parcelaN)*-t.valor,0))}</b> destas compras nos próximos meses.</div>`
+      :vazio({ic:'check',t:'Nenhuma compra parcelada',p:'Todas as compras desta fatura são à vista.'})
+  };
+  if(!vistas[faturaVista])faturaVista='categorias';
 
   el.innerHTML=`
   ${temCartao?S.cartoes.map(c=>{
     const r=cartaoResumo(c);
     const venc=`${String(c.vencimento).padStart(2,'0')}/${addMonthYM(ym,1).slice(5)}`;
     const corUso=r.uso>.8?'var(--bad)':r.uso>.5?'var(--warn)':'var(--good)';
-    return `<div class="card">
-      <h3><span style="display:flex;align-items:center;gap:8px"><i style="width:10px;height:10px;border-radius:3px;background:${esc(c.cor||'var(--c5)')}"></i>${esc(c.nome)}</span>
-        <span class="tag muted">fecha dia ${c.fechamento} · vence dia ${c.vencimento}</span></h3>
-      <div class="row" style="align-items:flex-end">
-        <div class="stat" style="border:0;background:none;padding:0;min-width:0"><div class="k">Fatura de ${ymShort(ym)} · vence ${venc}</div>
-          <div class="v" style="font-size:var(--t-2xl)">${brl(r.atual)}</div></div>
+    return `<div class="card cartao">
+      <div class="row" style="align-items:flex-start">
+        <div style="min-width:0"><div class="cnome"><i style="background:${esc(c.cor||'var(--c5)')}"></i>${esc(c.nome)}</div>
+          <div class="num cval">${brl(r.atual)}</div>
+          <div class="sub">fatura de ${ymShort(ym)} · vence ${venc}</div></div>
         <div class="btnrow" style="flex:none">
-          <button class="btn ghost sm" data-edit-cartao="${c.id}" aria-label="Editar cartão ${esc(c.nome)}">Editar</button>
           <button class="btn ghost sm" data-fatura="${c.id}">Detalhes</button>
+          <button class="iconbtn" data-edit-cartao="${c.id}" aria-label="Editar cartão ${esc(c.nome)}" title="Editar cartão">${svgIc('config',16)}</button>
         </div>
       </div>
-      <div class="hair"></div>
-      <div class="row" style="font-size:var(--t-xs);margin-bottom:6px">
-        <span class="muted">Limite usado</span><span class="num" style="font-weight:600">${brl(r.emAberto)} de ${brl(c.limite)}</span>
-      </div>
-      <div class="bar" style="height:10px" role="progressbar" aria-label="Limite usado" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${(r.uso*100).toFixed(0)}"><i style="width:${(r.uso*100).toFixed(1)}%;background:${corUso}"></i></div>
-      <div class="grid3" style="margin-top:var(--s3)">
-        <div class="stat"><div class="k">Disponível</div><div class="v" style="font-size:var(--t-base)">${brlK(r.disponivel)}</div></div>
-        <div class="stat"><div class="k">Parcelas futuras</div><div class="v" style="font-size:var(--t-base);color:var(--warn)">${brlK(r.futuro)}</div></div>
-        <div class="stat"><div class="k">Em aberto</div><div class="v" style="font-size:var(--t-base)">${brlK(r.emAberto)}</div></div>
-      </div>
+      <div class="bar" style="height:6px;margin-top:var(--s3)" role="progressbar" aria-label="Limite usado" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${(r.uso*100).toFixed(0)}"><i style="width:${(r.uso*100).toFixed(1)}%;background:${corUso}"></i></div>
+      <div class="row" style="font-size:var(--t-xs);margin-top:6px"><span class="muted">limite usado ${pct(r.uso,0)}</span><span class="muted num">disponível ${brl(r.disponivel)}</span></div>
     </div>`}).join('')
   :`<div class="card span2">${vazio({ic:'cartao',t:'Nenhum cartão cadastrado',
       p:'Cadastre o seu cartão (nome, limite, dia de fechamento e de vencimento) para importar faturas e acompanhar as parcelas futuras.',acao:'Cadastrar cartão',attrs:'data-novo-cartao'})}</div>`}
   ${temCartao?`<button class="addtile" data-novo-cartao><span class="vic" aria-hidden="true">${svgIc('cartao',22)}</span><span>+ Novo cartão</span></button>`:''}
 
-  ${cardFaturaCategorias(ym)}
+  ${temCartao?`<div class="card span2" id="cardFaturaMes">
+    <h3>Fatura de ${ymLabel(ym)} <span class="tag num">${txs.length} compra${txs.length===1?'':'s'} · ${brl(totMes)}</span></h3>
+    ${txs.length?`<div class="seg" role="group" aria-label="Ver a fatura por" style="margin-bottom:var(--s3)">
+        ${[['categorias','Categorias'],['lancamentos','Lançamentos'],['parcelas','Parcelas'+(parc.length?' ('+parc.length+')':'')]].map(([k,n])=>`<button data-fvista="${k}" aria-pressed="${faturaVista===k}">${n}</button>`).join('')}
+      </div><div id="faturaCorpo">${vistas[faturaVista]()}</div>`
+      :vazio({ic:'cartao',t:'Nenhuma compra no cartão em '+ymLabel(ym),p:'Importe o PDF ou a planilha da fatura logo abaixo.'})}
+  </div>`:''}
 
   <div class="card">
-    <h3>Compromissos já assumidos <span class="tag num">${brl(totalFut)}</span></h3>
-    <div class="sub" style="margin-bottom:var(--s3)">Parcelas que vão cair sozinhas nas próximas faturas. Esse dinheiro já saiu da sua liberdade — ele só ainda não saiu da conta.</div>
-    ${mesesFut.length?mesesFut.map(m=>`
-      <div style="padding:6px 0">
-        <div class="row" style="font-size:var(--t-sm);margin-bottom:4px"><span style="font-weight:650">${ymShort(m)}</span><span class="num">${brl(futuro[m])}</span></div>
-        <div class="bar" style="height:7px"><i style="width:${(futuro[m]/maxFut*100).toFixed(1)}%;background:var(--warn)"></i></div>
-      </div>`).join(''):vazio({ic:'check',t:'Nenhuma parcela em aberto',p:'Excelente: nada comprometido nos próximos meses.'})}
-    ${totalFut>0?`<div class="warnbox" style="margin-top:var(--s3)"><b>Custo real do parcelamento:</b> esses ${brl(totalFut)} deixariam de virar ${brl(custoOportunidade(totalFut).futuro)} em 10 anos se estivessem investidos hoje.</div>`:''}
+    <h3>Próximas faturas <span class="tag num">${brl(totalFut)}</span></h3>
+    ${mesesFut.length?barrasMeses(mesesFut.map(m=>({l:MES3[+m.slice(5)-1],v:futuro[m],t:brl(futuro[m])})),{alt:'Valor já comprometido nas próximas faturas',cor:'var(--warn)'})
+      +`<div class="sub" style="margin-top:var(--s2)">Parcelas que já vão cair sozinhas. Investidos hoje, esses ${brl(totalFut)} virariam ${brl(custoOportunidade(totalFut).futuro)} em 10 anos.</div>`
+      :vazio({ic:'check',t:'Nada comprometido',p:'Nenhuma parcela em aberto nos próximos meses.'})}
   </div>
 
-  <div class="card">
-    <h3>Importar fatura</h3>
-    ${temCartao?`<div class="sub" style="margin-bottom:var(--s3)">Escolha o <b>PDF da fatura</b> (eu leio sozinho, sem o arquivo sair do computador), o <b>CSV/XLSX</b> que o Nubank exporta ou cole qualquer lista com data, descrição e valor. Você confere tudo antes de gravar, e as parcelas futuras são criadas sozinhas.</div>
-    <div class="grid2">
+  <details class="card importar" ${temCartao&&!txs.length?'open':''}>
+    <summary><h3 style="margin:0">Importar fatura</h3><span class="sub">PDF, CSV, XLSX ou OFX</span></summary>
+    <div style="margin-top:var(--s3)">
+    ${temCartao?`<div class="grid2">
       <div class="fgroup"><label class="f" for="impCartao">Cartão</label>
         <select class="inp" id="impCartao">${S.cartoes.map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join('')}</select></div>
       <div class="fgroup"><label class="f" for="impMes">Mês do ciclo</label>
@@ -237,9 +254,11 @@ function renderFaturas(){
       <input class="inp" type="file" id="impArq" accept=".csv,.xlsx,.xls,.txt,.ofx,.pdf"></div>
     <div class="fgroup"><label class="f" for="impTexto">Ou cole o conteúdo aqui</label>
       <textarea class="inp" id="impTexto" placeholder="29 JUL •••• 1234 Mercado*Mercadolivre - Parcela 2/10 R$ 369,99&#10;03 AGO Google Youtube R$ 7,99"></textarea></div>
-    <button class="btn" id="btnImportar">Ler lançamentos</button>`
-    :vazio({ic:'cartao',t:'Primeiro, o cartão',p:'A fatura precisa de um cartão para entrar. Cadastre o cartão e volte aqui.',acao:'Cadastrar cartão',attrs:'data-novo-cartao'})}
-  </div>
+    <button class="btn" id="btnImportar">Ler lançamentos</button>
+    <div class="hint" style="margin-top:var(--s2)">O arquivo é lido aqui no navegador. Você confere tudo antes de gravar e as parcelas futuras são criadas sozinhas.</div>`
+    :vazio({ic:'cartao',t:'Primeiro, o cartão',p:'A fatura precisa de um cartão para entrar.',acao:'Cadastrar cartão',attrs:'data-novo-cartao'})}
+    </div>
+  </details>
 
   <details class="acc span2"><summary>Como o app trata cartão de crédito</summary><div class="body">
     O gasto conta no <b>mês do ciclo</b> em que a compra entrou na fatura — não no mês em que você paga. É assim que o gasto aparece perto da decisão que o gerou.<br><br>
@@ -249,6 +268,8 @@ function renderFaturas(){
   $$('[data-fatura]',el).forEach(b=>b.onclick=()=>abrirFatura(b.dataset.fatura));
   $$('[data-edit-cartao]',el).forEach(b=>b.onclick=()=>abrirCartao(b.dataset.editCartao));
   $$('[data-novo-cartao]',el).forEach(b=>b.onclick=()=>abrirCartao());
+  $$('[data-fvista]',el).forEach(b=>b.onclick=()=>{faturaVista=b.dataset.fvista;renderFaturas();$(`[data-fvista="${faturaVista}"]`)?.focus()});
+  $$('#faturaCorpo [data-tx]',el).forEach(b=>b.onclick=()=>abrirTx(b.dataset.tx));
   if($('#btnImportar')){
     $('#btnImportar').onclick=()=>importar();
     $('#impArq').onchange=e=>lerArquivo(e.target.files[0]);
@@ -289,6 +310,8 @@ function renderInvestir(){
     :vazio({ic:'carteira',t:'Carteira vazia',p:'Cadastre o que você já tem investido — ou importe um CSV ou os relatórios gerenciais — para o plano de liberdade ficar real.',acao:'+ Adicionar ativo',attrs:'data-add-ativo'})
       +`<div class="btnrow" style="justify-content:center"><button class="btn ghost sm" id="btnImpCsv">Importar CSV</button><button class="btn ghost sm" id="btnImpRel">Relatórios</button></div>`}
   </div>
+
+  <div class="pilha">${cardRendaFixa()}${cardResultados()}</div>
 
   <div class="card">
     <h3>Onde aportar <span class="tag muted">rebalanceamento · ${pct(S.perfil.metaPoupanca,0)} da renda</span></h3>
@@ -523,6 +546,8 @@ function renderConfig(){
       ${campoCfg('premissas.dyCarteira','DY da carteira a.a. (%)',{pctn:1,valor:pv(P.dyCarteira)})}
       ${campoCfg('premissas.mesesReserva','Meses de reserva',{tipo:'number',valor:P.mesesReserva})}
       ${campoCfg('premissas.idadeCoast','Idade Coast FIRE',{tipo:'number',valor:P.idadeCoast})}
+      ${campoCfg('premissas.cdiAA','CDI ao ano (%)',{pctn:1,valor:pv(P.cdiAA),hint:'Usado no rendimento da renda fixa'})}
+      ${campoCfg('premissas.inflacaoAA','IPCA ao ano (%)',{pctn:1,valor:pv(P.inflacaoAA),hint:'Usado nos títulos IPCA+'})}
     </div>
     <div class="sub">Retorno <b>real</b> = acima da inflação. 6% reais ≈ IPCA+6, próximo do juro longo brasileiro. Taxa de retirada entre 3,5% e 4% é o consenso conservador.</div>
   </div>
