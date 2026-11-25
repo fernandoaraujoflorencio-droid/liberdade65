@@ -8,6 +8,7 @@ const TITULOS={painel:'Painel',lancar:'Lançamentos',faturas:'Faturas',investir:
 const limites=()=>(S.metas||[]).filter(m=>m&&m.tipo==='limite'&&m.valor>0);
 const limiteDe=catId=>limites().find(m=>m.catId===catId)?.valor||0;
 
+let vista6='resumo';
 function renderPainel(){
   const ym=S.ui.ym, o=orcamento(ym), F=fire(), el=$('#v-painel');
   const semRenda=o.renda<=0;
@@ -60,10 +61,12 @@ function renderPainel(){
       ${parcelas?`<div class="row"><span>· das quais parcelas de cartão</span><span class="num" style="color:var(--warn)">${brl(parcelas)}</span></div>`:''}
       <div class="row"><span><b>Sobra do mês</b></span><span class="num ${sinalCls(o.guardado)}"><b>${brlS(o.guardado)}</b></span></div>
     </div>
+    ${o.tetoGasto>0||o.gasto>0?`<div class="hair"></div><div class="sub" style="margin-bottom:var(--s2)"><b style="color:var(--ink)">Ritmo do mês</b> · toque no gráfico para ver cada dia</div>${graficoRitmo(ym)}`:''}
   </div>
 
-  <div class="card"><h3>Últimos 6 meses</h3>
-    ${temHist?barrasGrupo(sm,[{n:'Entradas',cor:'var(--good)'},{n:'Gastos',cor:'var(--bad)'},{n:'Aportes',cor:'var(--c3)'}],{alt:'Entradas, gastos e aportes nos últimos 6 meses'})
+  <div class="card" id="card6m"><h3>Últimos 6 meses</h3>
+    ${temHist?`<div class="seg" role="group" aria-label="Ver os últimos 6 meses por" style="margin-bottom:var(--s3)">${[['resumo','Resumo'],['categorias','Categorias']].map(([k,n])=>`<button data-v6="${k}" aria-pressed="${vista6===k}">${n}</button>`).join('')}</div>`:''}
+    ${temHist&&vista6==='categorias'?graficoCategoriasMeses(ym,6):temHist?barrasGrupo(sm,[{n:'Entradas',cor:'var(--good)'},{n:'Gastos',cor:'var(--bad)'},{n:'Aportes',cor:'var(--c3)'}],{alt:'Entradas, gastos e aportes nos últimos 6 meses'})
       +(()=>{const g=sm.map(m=>m.vals[1]).filter(v=>v>0);const med=g.length?Math.round(g.reduce((a,b)=>a+b,0)/g.length):0;
         return med?`<div class="sub" style="margin-top:var(--s2)">Gasto médio <b class="num" style="color:var(--ink)">${brl(med)}</b>/mês · este mês ${o.gasto>med?'<span class="neg">acima</span>':'<span class="pos">abaixo</span>'} da média</div>`:''})()
       :vazio({ic:'investir',t:'Sem histórico ainda',p:'O gráfico aparece quando houver lançamentos nos meses anteriores.'})}
@@ -97,6 +100,7 @@ function renderPainel(){
   </div>`;
   el.querySelector('#cta-renda')?.addEventListener('click',()=>abrirConfigRenda());
   $('#btnLimites')?.addEventListener('click',()=>abrirLimites());
+  $$('[data-v6]',el).forEach(b=>b.onclick=()=>{vista6=b.dataset.v6;renderPainel();$(`[data-v6="${vista6}"]`)?.focus()});
 }
 function itemInsight(i){
   return `<div class="item" style="align-items:flex-start">
@@ -182,6 +186,9 @@ function renderFaturas(){
   const txs=S.transacoes.filter(t=>t.cartaoId&&t.competencia===ym&&t.valor<0);
   const totMes=-txs.reduce((a,t)=>a+t.valor,0);
   const parc=txs.filter(t=>t.parcelaDe>1);
+  const histFat=temCartao?graficoHistoricoFaturas(ym):'';
+  const dups=temCartao?acharDuplicados():[];
+  const imps=importacoes().slice(-5).reverse();
 
   const vistas={
     categorias:()=>{const gs=gruposPorCategoria(txs);
@@ -192,6 +199,7 @@ function renderFaturas(){
     lancamentos:()=>{const dias={};[...txs].sort((a,b)=>b.data.localeCompare(a.data)).forEach(t=>{(dias[t.data]=dias[t.data]||[]).push(t)});
       return Object.entries(dias).map(([d,arr])=>`<div class="daygroup"><span>${dLabel(d)}</span><span class="num">${brl(-arr.reduce((a,t)=>a+t.valor,0))}</span></div>
         <div class="list">${arr.map(itemTx).join('')}</div>`).join('')},
+    calendario:()=>calendarioGastos(txs,ym),
     parcelas:()=>parc.length?`<div class="list">${[...parc].sort((a,b)=>(b.parcelaDe-b.parcelaN)*-b.valor-(a.parcelaDe-a.parcelaN)*-a.valor).map(t=>{
         const falta=(t.parcelaDe-t.parcelaN)*-t.valor;
         return `<button class="item parc" data-tx="${t.id}">
@@ -205,6 +213,10 @@ function renderFaturas(){
   if(!vistas[faturaVista])faturaVista='categorias';
 
   el.innerHTML=`
+  ${dups.length?`<div class="warnbox aviso span2"><div class="aic" aria-hidden="true">⚠️</div><div class="acorpo">
+    <b>Encontrei ${dups.reduce((a,g)=>a+g.remover.length,0)} lançamento${dups.reduce((a,g)=>a+g.remover.length,0)>1?'s':''} repetido${dups.reduce((a,g)=>a+g.remover.length,0)>1?'s':''} nas faturas</b>
+    (${dups.slice(0,3).map(g=>esc(g.manter.desc)).join(', ')}). Confira e apague as cópias com um toque.</div>
+    <button class="btn sm" data-duplicados>Revisar</button></div>`:''}
   ${temCartao?S.cartoes.map(c=>{
     const r=cartaoResumo(c);
     const venc=`${String(c.vencimento).padStart(2,'0')}/${addMonthYM(ym,1).slice(5)}`;
@@ -229,12 +241,14 @@ function renderFaturas(){
   ${temCartao?`<div class="card span2" id="cardFaturaMes">
     <h3>Fatura de ${ymLabel(ym)} <span class="tag num">${txs.length} compra${txs.length===1?'':'s'} · ${brl(totMes)}</span></h3>
     ${txs.length?`<div class="seg" role="group" aria-label="Ver a fatura por" style="margin-bottom:var(--s3)">
-        ${[['categorias','Categorias'],['lancamentos','Lançamentos'],['parcelas','Parcelas'+(parc.length?' ('+parc.length+')':'')]].map(([k,n])=>`<button data-fvista="${k}" aria-pressed="${faturaVista===k}">${n}</button>`).join('')}
+        ${[['categorias','Categorias'],['lancamentos','Lançamentos'],['calendario','Calendário'],['parcelas','Parcelas'+(parc.length?' ('+parc.length+')':'')]].map(([k,n])=>`<button data-fvista="${k}" aria-pressed="${faturaVista===k}">${n}</button>`).join('')}
       </div><div id="faturaCorpo">${vistas[faturaVista]()}</div>`
       :vazio({ic:'cartao',t:'Nenhuma compra no cartão em '+ymLabel(ym),p:'Importe o PDF ou a planilha da fatura logo abaixo.'})}
   </div>`:''}
 
-  <div class="card">
+  ${histFat?`<div class="card"><h3>Histórico das faturas <span class="tag num">${brl(totalFut)} já comprometidos</span></h3>${histFat}
+    ${totalFut?`<div class="sub" style="margin-top:4px">Parcelas futuras já compradas: ${brl(totalFut)}. Investidos hoje, virariam ${brl(custoOportunidade(totalFut).futuro)} em 10 anos.</div>`:''}</div>`:''}
+  <div class="card" ${histFat?'hidden':''}>
     <h3>Próximas faturas <span class="tag num">${brl(totalFut)}</span></h3>
     ${mesesFut.length?barrasMeses(mesesFut.map(m=>({l:MES3[+m.slice(5)-1],v:futuro[m],t:brl(futuro[m])})),{alt:'Valor já comprometido nas próximas faturas',cor:'var(--warn)'})
       +`<div class="sub" style="margin-top:var(--s2)">Parcelas que já vão cair sozinhas. Investidos hoje, esses ${brl(totalFut)} virariam ${brl(custoOportunidade(totalFut).futuro)} em 10 anos.</div>`
@@ -260,6 +274,14 @@ function renderFaturas(){
     </div>
   </details>
 
+  ${temCartao?`<div class="card">
+    <h3>Importações recentes <button class="btn ghost sm" data-duplicados style="text-transform:none;letter-spacing:0">Procurar duplicados</button></h3>
+    ${imps.length?`<div class="list">${imps.map(i=>`<div class="item"><div class="mid"><div class="t">Fatura de ${ymLabel(i.competencia)}</div>
+      <div class="s">${esc(i.arquivo||'')} · ${new Date(i.em).toLocaleDateString('pt-BR')} · ${(i.ids||[]).length} lançamento${(i.ids||[]).length===1?'':'s'}${(i.substituidas||[]).length?' · '+i.substituidas.length+' prevista'+(i.substituidas.length>1?'s':'')+' atualizada'+(i.substituidas.length>1?'s':''):''}</div></div>
+      <button class="btn ghost sm" data-desfazer="${i.id}">Desfazer</button></div>`).join('')}</div>`
+      :`<div class="sub">Cada fatura importada aparece aqui e pode ser desfeita com um toque, caso algo entre errado. Importar o mesmo arquivo de novo não duplica nada.</div>`}
+  </div>`:''}
+
   <details class="acc span2"><summary>Como o app trata cartão de crédito</summary><div class="body">
     O gasto conta no <b>mês do ciclo</b> em que a compra entrou na fatura — não no mês em que você paga. É assim que o gasto aparece perto da decisão que o gerou.<br><br>
     Cada parcela vira um lançamento no mês em que ela vai cair. Por isso o app já sabe hoje o que você vai pagar em março, e desconta isso do seu teto de gastos daquele mês.
@@ -270,6 +292,12 @@ function renderFaturas(){
   $$('[data-novo-cartao]',el).forEach(b=>b.onclick=()=>abrirCartao());
   $$('[data-fvista]',el).forEach(b=>b.onclick=()=>{faturaVista=b.dataset.fvista;renderFaturas();$(`[data-fvista="${faturaVista}"]`)?.focus()});
   $$('#faturaCorpo [data-tx]',el).forEach(b=>b.onclick=()=>abrirTx(b.dataset.tx));
+  if(faturaVista==='calendario'&&$('#faturaCorpo'))ligarCalendario($('#faturaCorpo'),txs,ym);
+  $$('[data-desfazer]',el).forEach(b=>b.onclick=()=>{
+    const imp=importacoes().find(x=>x.id===b.dataset.desfazer);if(!imp)return;
+    confirmar({titulo:`Desfazer a importação de ${ymLabel(imp.competencia)}?`,texto:`Remove os ${(imp.ids||[]).length} lançamentos que ela criou${(imp.substituidas||[]).length?' e volta as parcelas previstas que ela atualizou':''}.`,botao:'Desfazer',perigo:true,aoConfirmar:()=>desfazerImportacao(imp.id)});
+  });
+  $$('[data-duplicados]',el).forEach(b=>b.onclick=()=>abrirDuplicados());
   if($('#btnImportar')){
     $('#btnImportar').onclick=()=>importar();
     $('#impArq').onchange=e=>lerArquivo(e.target.files[0]);
@@ -634,12 +662,14 @@ function cardEvolucao(){
 }
 function cardProventos(F,P){
   const itens=S.ativos.filter(a=>a.qtd>0&&a.dpa>0).map(a=>({n:a.ticker||a.nome,v:Math.round(a.qtd*a.dpa)})).sort((a,b)=>b.v-a.v);
-  const ano=itens.reduce((s,x)=>s+x.v,0);
+  const ano=itens.reduce((s,x)=>s+x.v,0), pm=proventosPorMes(12);
   return `<div class="card"><h3>Renda passiva</h3>
     <div class="grid2">
       <div class="stat"><div class="k">Proventos estimados</div><div class="v pos">${ano?brl(Math.round(ano/12)):'—'}</div><div class="d">${ano?'por mês · '+brl(ano)+'/ano pelo DPA':'informe o DPA ou importe relatórios'}</div></div>
       <div class="stat"><div class="k">Regra dos ${pct(P.swr,0)}</div><div class="v">${brl(F.rendaPassiva)}</div><div class="d">por mês, sem tocar no principal</div></div>
     </div>
+    ${pm.length>1?`<div class="hair"></div><div class="sub" style="margin-bottom:var(--s2)">Proventos por mês (rendimento por cota × suas cotas) · média <b class="num" style="color:var(--ink)">${brl(Math.round(pm.reduce((a,x)=>a+x.v,0)/pm.length))}</b></div>
+      ${barrasMeses(pm.map(x=>({l:MES3[+x.ym.slice(5)-1],v:x.v,t:ymLabel(x.ym)+': '+brl(x.v)})),{alt:'Proventos por mês',cor:'var(--good)'})}`:''}
     ${itens.length?`<div class="hair"></div><div class="sub" style="margin-bottom:var(--s2)">Quem paga mais por ano</div>${barrasH(itens.slice(0,6),{tot:ano})}`:''}
   </div>`;
 }

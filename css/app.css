@@ -582,3 +582,47 @@ body.privado :is(input[data-money],#txVal,#atValor,#atInv,#atPm,#atQtd,#mvValor,
   body:not(.imprimindo) nav.tabs,body:not(.imprimindo) .fab,body:not(.imprimindo) header.top .toprow,body:not(.imprimindo) .monthbar button{display:none!important}
   body:not(.imprimindo) #app{margin:0;padding:0}
 }
+
+/* ---------- gráficos: dica ao tocar, destaque e animações ---------- */
+.dica{position:fixed;z-index:999;left:0;top:0;transform:translate(-50%,-100%);pointer-events:none;max-width:min(260px,80vw);
+  background:var(--ink);color:var(--surface);font:600 var(--t-xs)/1.35 var(--f-sans);padding:6px 9px;border-radius:var(--r-sm);
+  box-shadow:var(--shadow-lg);opacity:0;transition:opacity .12s var(--ease)}
+.dica.on{opacity:1}
+svg [data-tip]{cursor:pointer;transition:opacity .15s,filter .15s}
+svg:has(rect.br.hl) rect.br:not(.hl){opacity:.38}
+svg .hl{filter:brightness(1.12) saturate(1.1)}
+svg rect.hit.hl{fill:var(--ink);opacity:.06}
+.empilhada i[data-tip]{cursor:pointer;transition:filter .15s}
+.empilhada i.hl{filter:brightness(1.15)}
+@media (prefers-reduced-motion:no-preference){
+  .entra svg rect:not(.hit){transform-box:fill-box;transform-origin:50% 100%;animation:l65cresce .55s cubic-bezier(.2,.8,.2,1) both}
+  .entra svg path.ln{stroke-dasharray:1;stroke-dashoffset:1;animation:l65traca .9s ease-out .1s forwards}
+  .entra .empilhada i,.entra .trk i,.entra .track i,.entra .bar i{transform-origin:0 50%;animation:l65estica .6s cubic-bezier(.2,.8,.2,1) both}
+  .entra .card,.entra .hero{animation:l65sobe .4s cubic-bezier(.2,.8,.2,1) both}
+  .entra .card:nth-child(2){animation-delay:40ms}.entra .card:nth-child(3){animation-delay:80ms}.entra .card:nth-child(4){animation-delay:120ms}.entra .card:nth-child(n+5){animation-delay:160ms}
+}
+@keyframes l65cresce{from{transform:scaleY(0)}}
+@keyframes l65traca{to{stroke-dashoffset:0}}
+@keyframes l65estica{from{transform:scaleX(0)}}
+@keyframes l65sobe{from{opacity:0;transform:translateY(8px)}}
+
+/* calendário de gastos */
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;max-width:440px}
+.cal b{font-size:var(--t-2xs);color:var(--ink-3);text-align:center;font-weight:650;padding-bottom:2px}
+.cal .vz{display:block}
+.cal .dia{aspect-ratio:1/1;border:0;border-radius:var(--r-xs);background:var(--sunken);color:var(--ink-3);font:600 var(--t-2xs) var(--f-num);
+  display:flex;align-items:flex-start;justify-content:flex-start;padding:4px;cursor:pointer;position:relative;transition:transform .12s}
+.cal .dia.tem{background:color-mix(in srgb,var(--accent) calc(var(--n)*100%),var(--sunken));color:var(--ink)}
+.cal .dia.esc span{color:var(--on-accent)}
+.cal .dia.hoje{outline:2px solid var(--ink);outline-offset:-2px}
+.cal .dia.sel{outline:2px solid var(--accent);outline-offset:1px}
+.cal .dia:hover{transform:scale(1.06)}
+.calesc{display:flex;gap:3px;margin:0 6px}
+.calesc i{width:14px;height:10px;border-radius:2px;background:color-mix(in srgb,var(--accent) calc(var(--n)*100%),var(--sunken))}
+#calDia:not(:empty){margin-top:var(--s3)}
+
+/* duplicados */
+.dupgrupo{padding:var(--s3) 0;border-bottom:1px solid var(--line)}
+.dupgrupo:last-child{border-bottom:0}
+.dupitem{display:flex;gap:var(--s2);align-items:center;margin-top:6px;font-size:var(--t-sm);cursor:pointer}
+.cal+.row{max-width:440px}

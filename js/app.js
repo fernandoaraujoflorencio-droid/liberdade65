@@ -139,7 +139,7 @@ function render(){
   fab.onclick=()=>inv?abrirMovimento():abrirTx();
 }
 function irPara(tab){
-  S.ui.tab=tab;salvar();render();scrollTo({top:0});
+  S.ui.tab=tab;salvar();render();scrollTo({top:0});animarEntrada();
 }
 document.body.addEventListener('click',e=>{
   const g=e.target.closest('[data-goto]');
@@ -147,8 +147,8 @@ document.body.addEventListener('click',e=>{
   if(e.target.closest('[data-backup-agora]'))exportarBackup();
 });
 $$('nav.tabs button[data-tab]').forEach(b=>b.onclick=()=>irPara(b.dataset.tab));
-$('#mPrev').onclick=()=>{S.ui.ym=addMonthYM(S.ui.ym,-1);salvar();render()};
-$('#mNext').onclick=()=>{S.ui.ym=addMonthYM(S.ui.ym,1);salvar();render()};
+$('#mPrev').onclick=()=>{S.ui.ym=addMonthYM(S.ui.ym,-1);salvar();render();animarEntrada()};
+$('#mNext').onclick=()=>{S.ui.ym=addMonthYM(S.ui.ym,1);salvar();render();animarEntrada()};
 $('#btnCfg').onclick=()=>irPara('config');
 
 /* tema: automático (segue o sistema) → escuro → claro */

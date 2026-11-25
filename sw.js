@@ -2,9 +2,9 @@
    Estratégia: tenta a rede primeiro (sempre a versão mais nova quando há
    internet) e cai no que está guardado quando a conexão falha.
    Não guarda dados pessoais: os dados do app ficam no localStorage. */
-const CACHE='liberdade65-v1';
+const CACHE='liberdade65-v2';
 const ARQUIVOS=['./','./index.html','./css/app.css','./cotacoes.js','./manifest.webmanifest',
-  './js/nucleo.js','./js/motor.js','./js/importacao.js','./js/carteira.js','./js/leitorpdf.js','./js/relatorios.js',
+  './js/nucleo.js','./js/motor.js','./js/graficos.js','./js/importacao.js','./js/carteira.js','./js/leitorpdf.js','./js/relatorios.js',
   './js/investimentos.js','./js/homebroker.js','./js/telas.js','./js/folhas.js','./js/app.js',
   './icones/icon-192.png','./icones/icon-512.png'];
 

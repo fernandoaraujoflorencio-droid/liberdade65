@@ -37,29 +37,62 @@ async function lerTextoPDF(arquivo,senha){
   for(let n=1;n<=doc.numPages;n++){
     const pg=await doc.getPage(n);
     const tc=await pg.getTextContent();
-    const porY=new Map();
-    /* itens com posição (x, y, largura, altura) para ler tabelas pela coluna */
-    itens.push(tc.items.filter(it=>it.str&&it.str.trim()).map(it=>({s:it.str,x:it.transform[4],y:it.transform[5],w:it.width||0,h:Math.abs(it.transform[3])||8})));
-    for(const it of tc.items){
-      if(!it.str||!it.str.trim())continue;
-      const y=Math.round(it.transform[5]/2)*2, x=it.transform[4];
-      if(!porY.has(y))porY.set(y,[]);
-      porY.get(y).push({x,s:it.str,w:it.width||0});
-    }
-    const linhas=[...porY.entries()].sort((a,b)=>b[0]-a[0]).map(([,itens])=>{
-      itens.sort((a,b)=>a.x-b.x);
-      let txt='',fim=null;
-      for(const i of itens){
-        if(fim!==null&&i.x-fim>1&&!/\s$/.test(txt))txt+=' ';
-        txt+=i.s;fim=i.x+i.w;
-      }
-      return txt.replace(/\s+/g,' ').trim();
-    }).filter(Boolean);
-    paginas.push(linhas);
+    const brutos=tc.items.filter(it=>it.str&&it.str.trim()).map(it=>({s:it.str,x:it.transform[4],y:it.transform[5],w:it.width||0,h:Math.abs(it.transform[3])||8}));
+    const pagItens=removerCamadas(brutos);
+    itens.push(pagItens);                       /* com posição, para ler tabelas pela coluna */
+    paginas.push(montarLinhas(pagItens));
   }
   const texto=paginas.map(p=>p.join('\n')).join('\n');
   if(texto.replace(/\s/g,'').length<20){const x=new Error('sem texto');x.tipo='sem-texto';throw x}
   return{paginas,texto,itens};
+}
+/* Alguns PDFs desenham o mesmo texto duas vezes (efeito de negrito, sombra ou
+   camada de acessibilidade). Itens com o mesmo texto quase na mesma posição
+   viram um só — era isso que duplicava compras na leitura. */
+function removerCamadas(lista){
+  const out=[];
+  for(const it of lista){
+    const t=it.s.trim();
+    const dup=out.some(o=>o.s.trim()===t&&Math.abs(o.x-it.x)<2.5&&Math.abs(o.y-it.y)<2.5);
+    if(!dup)out.push(it);
+  }
+  return out;
+}
+const RE_INICIO_DATA=/^\s*(\d{1,2}\s+(JAN|FEV|MAR|ABR|MAI|JUN|JUL|AGO|SET|OUT|NOV|DEZ)\b|\d{1,2}\/\d{1,2}\b)/i;
+/* Junta os itens em linhas pela altura (com tolerância, para a data e o valor
+   não se separarem) e separa colunas quando há duas compras lado a lado. */
+function montarLinhas(lista){
+  const ord=[...lista].sort((a,b)=>b.y-a.y||a.x-b.x);
+  const grupos=[];
+  for(const it of ord){
+    const tol=Math.max(2.5,Math.min(it.h,12)*.4);
+    const g=grupos.find(g=>Math.abs(g.y-it.y)<=tol);
+    if(g){g.itens.push(it);g.y=(g.y*(g.itens.length-1)+it.y)/g.itens.length}
+    else grupos.push({y:it.y,itens:[it]});
+  }
+  grupos.sort((a,b)=>b.y-a.y);
+  const linhas=[];
+  for(const g of grupos){
+    const itensX=g.itens.sort((a,b)=>a.x-b.x);
+    let seg=[],fim=null;
+    const fecha=()=>{if(seg.length)linhas.push(juntar(seg));seg=[]};
+    for(const i of itensX){
+      const gap=fim===null?0:i.x-fim;
+      /* espaço grande seguido de uma data = outra coluna, outra compra */
+      if(fim!==null&&gap>40&&RE_INICIO_DATA.test(i.s)&&/\d,\d{2}\s*$/.test(juntar(seg)))fecha();
+      seg.push(i);fim=Math.max(fim??-Infinity,i.x+i.w);
+    }
+    fecha();
+  }
+  return linhas.filter(Boolean);
+}
+function juntar(seg){
+  let txt='',fim=null;
+  for(const i of seg){
+    if(fim!==null&&i.x-fim>1&&!/\s$/.test(txt))txt+=' ';
+    txt+=i.s;fim=i.x+i.w;
+  }
+  return txt.replace(/\s+/g,' ').trim();
 }
 const MSG_PDF={
   'senha':'Este PDF tem senha. Digite a senha para eu ler (ela não é guardada).',
